@@ -2,7 +2,7 @@ import client.MesaPrx;
 import client.Voto;
 import com.zeroc.Ice.*;
 
-public class Mesavotacion {
+public class MesaVotacion {
     public static void main(String[] args) {
         try (Communicator communicator = Util.initialize(args)) {
             // Conectarse al cliente que está escuchando en el puerto 10000
