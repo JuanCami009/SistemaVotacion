@@ -15,12 +15,15 @@ public class Mesavotacion {
             }
 
             // Crear un voto y asignar valores
-            Voto voto = new Voto();
-            voto.idVoto = 1;  // Ejemplo de id, puedes asignar lo que necesites
+            for (int i = 0; i < 100; i++) {
+                Voto voto = new Voto();
+                voto.idVoto = i;  // Ejemplo de id, puedes asignar lo que necesites
 
-            // Enviar el voto al cliente
-            cliente.enviarVoto(voto);
-            System.out.println("Voto enviado correctamente al cliente.");
+                // Enviar el voto al cliente
+                cliente.enviarVoto(voto);
+                System.out.println("Voto enviado correctamente al cliente.");
+            }
+            
         }
     }
 }

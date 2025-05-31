@@ -27,8 +27,6 @@ public class ReliableServer {
         job.start();
 
         communicator.waitForShutdown();
-
-
         
     }
 

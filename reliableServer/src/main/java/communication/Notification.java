@@ -18,8 +18,6 @@ public class Notification {
         this.service = service;
     }
 
-    
-
     public void sendMessage(ReliableMessage message){
         service.reciveMessage(message, ackService);
     }
