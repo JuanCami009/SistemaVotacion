@@ -1,8 +1,9 @@
 slice {
     java {
-        files = [file("../Service.ice")]
+        files = [file("client.ice")]
     }
 }
+
 repositories {
     mavenCentral()
 }
