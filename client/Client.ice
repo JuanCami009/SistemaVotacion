@@ -1,5 +1,10 @@
 module client {
+
+    struct Voto {
+        int idVoto;
+    };
+
     interface Mesa {
-        void enviarACliente(string mensaje);
+        void enviarVoto(Voto voto);
     }
 }

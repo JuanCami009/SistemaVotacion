@@ -1,7 +1,8 @@
 import client.MesaPrx;
+import client.Voto;
 import com.zeroc.Ice.*;
 
-public class MesaVotacion {
+public class Mesavotacion {
     public static void main(String[] args) {
         try (Communicator communicator = Util.initialize(args)) {
             // Conectarse al cliente que está escuchando en el puerto 10000
@@ -13,8 +14,13 @@ public class MesaVotacion {
                 return;
             }
 
-            cliente.enviarACliente("Hola desde mesa de votación");
-            System.out.println("Mensaje enviado correctamente al cliente.");
+            // Crear un voto y asignar valores
+            Voto voto = new Voto();
+            voto.idVoto = 1;  // Ejemplo de id, puedes asignar lo que necesites
+
+            // Enviar el voto al cliente
+            cliente.enviarVoto(voto);
+            System.out.println("Voto enviado correctamente al cliente.");
         }
     }
 }
