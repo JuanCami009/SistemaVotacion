@@ -18,9 +18,10 @@ public class ClientReceiver implements Mesa {
     public void enviarVoto(Voto voto, Current current) {
         System.out.println("Voto recibido: id " + voto.idVoto);
 
-        // Convertir Voto a Message (ajusta según tu modelo)
+        // Convertir Voto a Message incluyendo el idVoto explícitamente
         Message msg = new Message();
-        msg.message = "Voto id: " + voto.idVoto; // o serializa más campos si quieres
+        msg.idVoto = voto.idVoto;               // campo nuevo para identificación única
+        msg.message = "Voto id: " + voto.idVoto; // campo descriptivo, opcional
 
         try {
             rm.sendMessage(msg);
@@ -29,4 +30,5 @@ public class ClientReceiver implements Mesa {
             System.err.println("Error reenviando voto: " + e.getMessage());
         }
     }
+
 }
