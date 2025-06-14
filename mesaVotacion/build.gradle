@@ -6,6 +6,7 @@ repositories {
 dependencies {
     implementation 'com.zeroc:ice:3.7.2'
     implementation project(':client')
+    implementation project(':server')
 }
 
 jar {

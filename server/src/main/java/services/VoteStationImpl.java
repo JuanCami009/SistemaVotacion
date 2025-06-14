@@ -1,5 +1,6 @@
 package services;
 
+import app.Candidato;
 import app.VoteStation;
 import com.zeroc.Ice.Current;
 import db.ConexionBD;
@@ -8,6 +9,7 @@ import model.Voto;
 
 import java.sql.Connection;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class VoteStationImpl implements VoteStation {
 
@@ -19,28 +21,48 @@ public class VoteStationImpl implements VoteStation {
         ManejadorDatos manejador = new ManejadorDatos(conn);
 
         try {
-            // 3. Verificar si existe el ciudadano en la BD
             if (!manejador.existeCiudadano(document)) {
-                return 3; // No existe
+                return 3;
             }
-
             if (!manejador.esSuMesa(document, mesaId)) {
                 return 1;
             }
-
-            // 1. Verificar si ya votó
             if (!manejador.registrarCiudadanoSiNoExiste(document)) {
-                return 2; // Ya votó
+                return 2;
             }
 
-            // Registrar voto
             Voto voto = new Voto(0, candidateId, LocalDateTime.now());
             manejador.registrarVoto(voto);
-            return 0; // Puede votar
+            return 0;
 
         } catch (Exception e) {
             e.printStackTrace();
             return -1;
+        } finally {
+            connBD.cerrarConexion();
+        }
+    }
+
+    @Override
+    public Candidato[] listar(Current current) {
+        ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
+        connBD.conectarBaseDatos();
+        Connection conn = connBD.getConnection();
+        ManejadorDatos manejador = new ManejadorDatos(conn);
+
+        try {
+            List<model.Candidato> lista = manejador.listarCandidatos();
+            Candidato[] resultado = new Candidato[lista.size()];
+            for (int i = 0; i < lista.size(); i++) {
+                model.Candidato c = lista.get(i);
+                resultado[i] = new Candidato(c.getId(), c.getNombre(), c.getPartidoPolitico());
+            }
+            return resultado;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new Candidato[0];
+
         } finally {
             connBD.cerrarConexion();
         }
