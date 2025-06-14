@@ -6,4 +6,5 @@ public class Message implements Serializable {
     public String message;
     public String documento; // opcional, si necesitas identificar el documento del voto
     public int idCandidato; // opcional, si necesitas identificar el candidato del voto
+    public int mesaId; // opcional, si necesitas identificar la mesa de votación
 }

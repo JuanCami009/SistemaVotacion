@@ -4,7 +4,7 @@ module app{
     }
 
     interface VoteStation {
-        int vote(string document, int candidateId);
+        int vote(string document, int candidateId, int mesaId);
     }
     
 }

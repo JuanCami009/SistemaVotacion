@@ -72,4 +72,18 @@ public class ManejadorDatos {
         }
     }
 
+    public boolean esSuMesa(String documento, int mesaId) throws SQLException {
+        String sql = "SELECT mesa_id FROM ciudadano WHERE documento = ?";
+        try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
+            stmt.setString(1, documento);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                int mesaAsignada = rs.getInt("mesa_id");
+                return mesaAsignada == mesaId;
+            }
+            return false;
+        }
+    }
+
+
 }

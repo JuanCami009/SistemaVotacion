@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 public class VoteStationImpl implements VoteStation {
 
     @Override
-    public int vote(String document, int candidateId, Current current) {
+    public int vote(String document, int candidateId, int mesaId, Current current) {
         ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
         connBD.conectarBaseDatos();
         Connection conn = connBD.getConnection();
@@ -22,6 +22,10 @@ public class VoteStationImpl implements VoteStation {
             // 3. Verificar si existe el ciudadano en la BD
             if (!manejador.existeCiudadano(document)) {
                 return 3; // No existe
+            }
+
+            if (!manejador.esSuMesa(document, mesaId)) {
+                return 1;
             }
 
             // 1. Verificar si ya votó

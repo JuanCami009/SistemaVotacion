@@ -20,12 +20,27 @@ public class ServiceImp implements RMDestination {
     @Override
     public void reciveMessage(ReliableMessage rmessage, ACKServicePrx prx, Current current) {
         Message msg = rmessage.getMessage();
-        System.out.println("Cantidad de votos recibidos: "+ contadorExito++);
         prx.ack(rmessage.getUuid());
 
         VoteStationImpl validador = new VoteStationImpl();
-        int result = validador.vote(msg.documento, msg.idCandidato, current);
-        System.out.println("Resultado de validación y almacenamiento: " + result);
+        int estado = validador.vote(msg.documento, msg.idCandidato, msg.mesaId, current);
+
+        String result = "";
+
+        if (estado == 0) {
+            result = "Voto exitoso";
+            contadorExito++;
+        } else if (estado == 1) {
+            result = "Mesa equivocada";
+        } else if (estado == 2) {
+            result = "Voto duplicado";
+        } else if (estado == 3) {
+            result = "Documento no encontrado";
+        } else {
+            result = "Error al procesar el voto";
+        }
+
+        System.out.println("Estado: " + estado + " - " + "Resultado: " + result);
     }
 
 }
