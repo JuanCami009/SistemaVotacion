@@ -44,13 +44,14 @@ public class RMJob extends Thread{
     @Override
     public void run(){
         while (enable) { 
-            System.out.println("cicle");
             for(Map.Entry<String,ReliableMessage> rm: messagesPendig.entrySet()){
                 try {
-                    System.out.println("Sendig messge");
+                    System.out.println("Sending message");
                     notification.sendMessage(rm.getValue());
                     messagesPendig.remove(rm.getKey());
                     forConfirm.put(rm.getKey(), rm.getValue());
+                    System.out.println("Message sent: " + rm.getValue().getMessage().documento + " - " + rm.getValue().getMessage().idCandidato);
+
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

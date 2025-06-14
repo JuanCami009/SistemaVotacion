@@ -14,18 +14,18 @@ public class ClientReceiver implements Mesa {
         this.rm = rm;
     }
 
-    @Override
+   @Override
     public void enviarVoto(Voto voto, Current current) {
-        System.out.println("Voto recibido: id " + voto.idVoto);
+        System.out.println("Voto recibido de documento " + voto.documento + " para candidato " + voto.idCandidato);
 
-        // Convertir Voto a Message incluyendo el idVoto explícitamente
         Message msg = new Message();
-        msg.idVoto = voto.idVoto;               // campo nuevo para identificación única
-        msg.message = "Voto id: " + voto.idVoto; // campo descriptivo, opcional
+        msg.message = "Documento: " + voto.documento + ", Candidato: " + voto.idCandidato;
+        msg.documento = voto.documento;
+        msg.idCandidato = voto.idCandidato;
 
         try {
             rm.sendMessage(msg);
-            System.out.println("Voto reenviado a reliable message.");
+            System.out.println("Voto reenviado a ReliableMessaging.");
         } catch (Exception e) {
             System.err.println("Error reenviando voto: " + e.getMessage());
         }

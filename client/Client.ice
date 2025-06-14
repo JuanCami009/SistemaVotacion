@@ -1,7 +1,7 @@
 module client {
-
     struct Voto {
-        int idVoto;
+        string documento;
+        int idCandidato;
     };
 
     interface Mesa {

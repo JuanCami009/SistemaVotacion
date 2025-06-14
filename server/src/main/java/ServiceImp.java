@@ -3,6 +3,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.zeroc.Ice.Current;
 
+import services.VoteStationImpl;
 import model.Message;
 import model.ReliableMessage;
 import reliableMessage.ACKServicePrx;
@@ -19,17 +20,12 @@ public class ServiceImp implements RMDestination {
     @Override
     public void reciveMessage(ReliableMessage rmessage, ACKServicePrx prx, Current current) {
         Message msg = rmessage.getMessage();
-
-        if (!votosProcesados.add(msg.idVoto)) {
-            System.out.println("Duplicado detectado para voto id: " + msg.idVoto);
-            System.out.println("Contador Duplicados: "+contadorDuplicado++);
-            
-            prx.ack(rmessage.getUuid());
-            return;
-        }
-
-        System.out.println("Procesando voto id: " + msg.idVoto);
         System.out.println("Cantidad de votos recibidos: "+ contadorExito++);
         prx.ack(rmessage.getUuid());
+
+        VoteStationImpl validador = new VoteStationImpl();
+        int result = validador.vote(msg.documento, msg.idCandidato, current);
+        System.out.println("Resultado de validación y almacenamiento: " + result);
     }
+
 }

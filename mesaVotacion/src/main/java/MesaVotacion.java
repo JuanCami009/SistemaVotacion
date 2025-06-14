@@ -2,10 +2,11 @@ import client.MesaPrx;
 import client.Voto;
 import com.zeroc.Ice.*;
 
+import java.util.Scanner;
+
 public class MesaVotacion {
     public static void main(String[] args) {
         try (Communicator communicator = Util.initialize(args)) {
-            // Conectarse al cliente que está escuchando en el puerto 10000
             ObjectPrx base = communicator.stringToProxy("client:tcp -h localhost -p 10000");
             MesaPrx cliente = MesaPrx.checkedCast(base);
 
@@ -14,16 +15,25 @@ public class MesaVotacion {
                 return;
             }
 
-            // Crear un voto y asignar valores
-            for (int i = 0; i < 100; i++) {
-                Voto voto = new Voto();
-                voto.idVoto = i;  // Ejemplo de id, puedes asignar lo que necesites
+            Scanner scanner = new Scanner(System.in);
 
-                // Enviar el voto al cliente
+            while (true) {
+                System.out.print("Documento del votante (o 'salir'): ");
+                String documento = scanner.nextLine();
+                if (documento.equalsIgnoreCase("salir")) break;
+
+                System.out.print("ID del candidato: ");
+                int idCandidato = Integer.parseInt(scanner.nextLine());
+
+                Voto voto = new Voto();
+                voto.documento = documento;
+                voto.idCandidato = idCandidato;
+
                 cliente.enviarVoto(voto);
-                System.out.println("Voto enviado correctamente al cliente.");
+                System.out.println("Voto enviado correctamente al cliente.\n");
             }
-            
+
+            scanner.close();
         }
     }
 }

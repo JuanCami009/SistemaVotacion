@@ -1,4 +1,4 @@
-package main.java.db;
+package db;
 
 import model.Candidato;
 import model.Voto;
@@ -15,6 +15,7 @@ public class ManejadorDatos {
     public ManejadorDatos(Connection conexion) {
         this.conexion = conexion;
     }
+
 
     public void registrarVoto(Voto voto) throws SQLException {
         String sql = "INSERT INTO voto (candidato, fecha_emision) VALUES (?, ?)";
@@ -41,4 +42,34 @@ public class ManejadorDatos {
         }
         return candidatos;
     }
+
+    public boolean registrarCiudadanoSiNoExiste(String documento) throws SQLException {
+        String checkSql = "SELECT 1 FROM ciudadano_voto WHERE documento = ?";
+        try (PreparedStatement checkStmt = conexion.prepareStatement(checkSql)) {
+            checkStmt.setString(1, documento);
+            ResultSet rs = checkStmt.executeQuery();
+            if (rs.next()) {
+                // El ciudadano ya votó
+                return false;
+            }
+        }
+
+        String insertSql = "INSERT INTO ciudadano_voto (documento, fecha_voto) VALUES (?, ?)";
+        try (PreparedStatement insertStmt = conexion.prepareStatement(insertSql)) {
+            insertStmt.setString(1, documento);
+            insertStmt.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
+            insertStmt.executeUpdate();
+            return true;
+        }
+    }
+
+    public boolean existeCiudadano(String documento) throws SQLException {
+        String sql = "SELECT 1 FROM ciudadano WHERE documento = ?";
+        try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
+            stmt.setString(1, documento);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+        }
+    }
+
 }
