@@ -72,9 +72,10 @@ public class ClientReceiver implements Mesa {
         System.out.println("Voto recibido de documento " + voto.documento + " para candidato " + voto.idCandidato);
 
         Message msg = new Message();
-        msg.message = "Documento: " + voto.documento + ", Candidato: " + voto.idCandidato;
+        msg.message = "Documento: " + voto.documento + ", Candidato: " + voto.idCandidato+ ", Mesa: " + voto.mesaId+ ", Mesa ID: " + voto.mesaId;
         msg.documento = voto.documento;
         msg.idCandidato = voto.idCandidato;
+        msg.mesaId = voto.mesaId;
 
         try {
             rm.sendMessage(msg);
@@ -116,17 +117,19 @@ import java.util.Scanner;
 
 public class MesaVotacion {
     public static void main(String[] args) {
+        if (args.length < 1) {
+            System.out.println("Por favor, proporciona el ID de la mesa como argumento.");
+            System.exit(1);
+        }
+
+        int mesaId = Integer.parseInt(args[0]);
+        System.out.println("📌 Esta mesa tiene ID: " + mesaId);
+
         try (Communicator communicator = Util.initialize(args)) {
             ObjectPrx base = communicator.stringToProxy("client:tcp -h localhost -p 10000");
             MesaPrx cliente = MesaPrx.checkedCast(base);
 
-            if (cliente == null) {
-                System.err.println("No se pudo obtener el proxy del cliente.");
-                return;
-            }
-
             Scanner scanner = new Scanner(System.in);
-
             while (true) {
                 System.out.print("Documento del votante (o 'salir'): ");
                 String documento = scanner.nextLine();
@@ -138,12 +141,14 @@ public class MesaVotacion {
                 Voto voto = new Voto();
                 voto.documento = documento;
                 voto.idCandidato = idCandidato;
+                voto.mesaId = mesaId;
 
                 cliente.enviarVoto(voto);
-                System.out.println("Voto enviado correctamente al cliente.\n");
+                System.out.println("✅ Voto enviado correctamente.\n");
             }
 
-            scanner.close();
+        } catch (java.lang.Exception e) {
+            e.printStackTrace();
         }
     }
 }
@@ -320,6 +325,7 @@ public class Message implements Serializable {
     public String message;
     public String documento; // opcional, si necesitas identificar el documento del voto
     public int idCandidato; // opcional, si necesitas identificar el candidato del voto
+    public int mesaId; // opcional, si necesitas identificar la mesa de votación
 }
 
 --------------------------------------------------
@@ -494,11 +500,12 @@ Estructura completa:
     │   ├── Server.java
     │   ├── ServiceImp.java
     │   └── services
+    │       ├── QueryStationImpl.java
     │       └── VoteStationImpl.java
     └── resources
         └── server.config
 
-7 directories, 14 files
+7 directories, 15 files
 
 🧾 Archivos de código en ./server/src (con contenido):
 
@@ -510,6 +517,8 @@ import com.zeroc.Ice.Util;
 
 import services.VoteStationImpl;
 import app.VoteStation;
+import services.QueryStationImpl;
+import app.QueryStation;
 
 public class Server {
 
@@ -517,12 +526,14 @@ public class Server {
         Communicator com = Util.initialize(args, "server.config"); // << aquí está el cambio
         ServiceImp imp = new ServiceImp();
         VoteStation voteService = new VoteStationImpl();
+        QueryStation queryService = new QueryStationImpl();
 
 
         ObjectAdapter adapter = com.createObjectAdapter("Server");
 
         adapter.add(voteService, Util.stringToIdentity("voteStation"));
         adapter.add(imp, Util.stringToIdentity("Service"));
+        adapter.add(queryService, Util.stringToIdentity("queryStation"));
         adapter.activate();
         com.waitForShutdown();
     }
@@ -558,8 +569,24 @@ public class ServiceImp implements RMDestination {
         prx.ack(rmessage.getUuid());
 
         VoteStationImpl validador = new VoteStationImpl();
-        int result = validador.vote(msg.documento, msg.idCandidato, current);
-        System.out.println("Resultado de validación y almacenamiento: " + result);
+        int estado = validador.vote(msg.documento, msg.idCandidato, msg.mesaId, current);
+
+        String result = "";
+
+        if (estado == 0) {
+            result = "Voto exitoso";
+            contadorExito++;
+        } else if (estado == 1) {
+            result = "Mesa equivocada";
+        } else if (estado == 2) {
+            result = "Voto duplicado";
+        } else if (estado == 3) {
+            result = "Documento no encontrado";
+        } else {
+            result = "Error al procesar el voto";
+        }
+
+        System.out.println("Estado: " + estado + " - " + "Resultado: " + result);
     }
 
 }
@@ -699,6 +726,52 @@ public class ManejadorDatos {
             return rs.next();
         }
     }
+
+    public boolean esSuMesa(String documento, int mesaId) throws SQLException {
+        String sql = "SELECT mesa_id FROM ciudadano WHERE documento = ?";
+        try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
+            stmt.setString(1, documento);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                int mesaAsignada = rs.getInt("mesa_id");
+                return mesaAsignada == mesaId;
+            }
+            return false;
+        }
+    }
+
+    public String obtenerLugarVotacion(String documento) throws SQLException {
+        String sql = 
+            "SELECT " +
+            "    p.nombre AS puesto_nombre, " +
+            "    p.direccion, " +
+            "    m.nombre AS municipio_nombre, " +
+            "    d.nombre AS departamento_nombre, " +
+            "    mv.consecutive AS mesa " +
+            "FROM ciudadano c " +
+            "JOIN mesa_votacion mv ON c.mesa_id = mv.id " +
+            "JOIN puesto_votacion p ON mv.puesto_id = p.id " +
+            "JOIN municipio m ON p.municipio_id = m.id " +
+            "JOIN departamento d ON m.departamento_id = d.id " +
+            "WHERE c.documento = ?";
+
+        try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
+            stmt.setString(1, documento);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return "Usted debe votar en " +
+                        rs.getString("puesto_nombre") + " ubicado en " +
+                        rs.getString("direccion") + ", " +
+                        rs.getString("municipio_nombre") + ", " +
+                        rs.getString("departamento_nombre") +
+                        " en la mesa " + rs.getInt("mesa") + ".";
+            } else {
+                return null;
+            }
+        }
+    }
+
+
 
 }
 
@@ -1096,7 +1169,7 @@ import java.time.LocalDateTime;
 public class VoteStationImpl implements VoteStation {
 
     @Override
-    public int vote(String document, int candidateId, Current current) {
+    public int vote(String document, int candidateId, int mesaId, Current current) {
         ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
         connBD.conectarBaseDatos();
         Connection conn = connBD.getConnection();
@@ -1106,6 +1179,10 @@ public class VoteStationImpl implements VoteStation {
             // 3. Verificar si existe el ciudadano en la BD
             if (!manejador.existeCiudadano(document)) {
                 return 3; // No existe
+            }
+
+            if (!manejador.esSuMesa(document, mesaId)) {
+                return 1;
             }
 
             // 1. Verificar si ya votó
@@ -1130,6 +1207,39 @@ public class VoteStationImpl implements VoteStation {
 --------------------------------------------------
 
 
+./server/src/main/java/services/QueryStationImpl.java
+
+package services;
+
+import app.QueryStation;
+import com.zeroc.Ice.Current;
+import db.ConexionBD;
+import db.ManejadorDatos;
+
+import java.sql.Connection;
+
+public class QueryStationImpl implements QueryStation {
+    @Override
+    public String query(String document, Current current) {
+        ConexionBD con = new ConexionBD(current.adapter.getCommunicator());
+        con.conectarBaseDatos();
+        Connection conn = con.getConnection();
+
+        try {
+            ManejadorDatos manejador = new ManejadorDatos(conn);
+            return manejador.obtenerLugarVotacion(document);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        } finally {
+            con.cerrarConexion();
+        }
+    }
+}
+
+--------------------------------------------------
+
+
 ./server/src/main/resources/server.config
 
 ConexionBD = jdbc:postgresql://localhost:5432/sistema_votaciones
@@ -1137,6 +1247,64 @@ usuarioBD = votaciones_user
 paswordBD = votaciones123
 
 Server.Endpoints=tcp -h localhost -p 10012
+--------------------------------------------------
+
+
+📁 Carpeta procesada: ./consultarLugar/src
+Estructura completa:
+./consultarLugar/src
+└── main
+    ├── java
+    │   └── ConsultarLugar.java
+    └── resources
+        └── consulta.config
+
+4 directories, 2 files
+
+🧾 Archivos de código en ./consultarLugar/src (con contenido):
+
+./consultarLugar/src/main/java/ConsultarLugar.java
+
+import app.QueryStationPrx;
+import com.zeroc.Ice.*;
+
+import java.util.Scanner;
+
+public class ConsultarLugar {
+    public static void main(String[] args) {
+        try (Communicator communicator = Util.initialize(args, "ConsultaLugar.config")) {
+            ObjectPrx base = communicator.stringToProxy("queryStation:tcp -h localhost -p 10012");
+            QueryStationPrx proxy = QueryStationPrx.checkedCast(base);
+
+            if (proxy == null) {
+                System.out.println("No se pudo obtener el proxy del servidor.");
+                return;
+            }
+
+            Scanner scanner = new Scanner(System.in);
+            while (true) {
+                System.out.print("Ingrese su número de documento (o 'salir'): ");
+                String documento = scanner.nextLine();
+                if (documento.equalsIgnoreCase("salir")) break;
+
+                String respuesta = proxy.query(documento);
+                if (respuesta == null) {
+                    System.out.println("❌ El ciudadano no fue encontrado.");
+                } else {
+                    System.out.println("✅ " + respuesta);
+                }
+                System.out.println();
+            }
+        }
+    }
+}
+
+--------------------------------------------------
+
+
+./consultarLugar/src/main/resources/consulta.config
+
+
 --------------------------------------------------
 
 
@@ -1174,6 +1342,7 @@ module client {
     struct Voto {
         string documento;
         int idCandidato;
+        int mesaId;
     };
 
     interface Mesa {
@@ -1328,7 +1497,11 @@ module app{
     }
 
     interface VoteStation {
-        int vote(string document, int candidateId);
+        int vote(string document, int candidateId, int mesaId);
+    }
+
+    interface QueryStation {
+        string query(string document);
     }
     
 }
@@ -1351,6 +1524,29 @@ include('reliableServer')
 include('server')
 include('client')
 include ('mesaVotacion')
+include('consultarLugar')
+--------------------------------------------------
 
+
+./consultarLugar/build.gradle
+
+
+repositories {
+    mavenCentral()
+}
+
+dependencies{
+    implementation 'com.zeroc:ice:3.7.2'
+    implementation project(':server')
+}
+
+jar {
+        manifest {
+            attributes(
+                "Main-Class": project.name.capitalize(),
+                "Class-Path": configurations.runtimeClasspath.resolve().collect { it.toURI() }.join(' ')
+            )
+        }
+    }
 --------------------------------------------------
 

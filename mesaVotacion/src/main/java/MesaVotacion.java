@@ -12,7 +12,7 @@ public class MesaVotacion {
         }
 
         int mesaId = Integer.parseInt(args[0]);
-        System.out.println("📌 Esta mesa tiene ID: " + mesaId);
+        System.out.println("Esta mesa tiene ID: " + mesaId);
 
         try (Communicator communicator = Util.initialize(args)) {
             ObjectPrx base = communicator.stringToProxy("client:tcp -h localhost -p 10000");
@@ -33,7 +33,7 @@ public class MesaVotacion {
                 voto.mesaId = mesaId;
 
                 cliente.enviarVoto(voto);
-                System.out.println("✅ Voto enviado correctamente.\n");
+                System.out.println("Voto enviado correctamente.\n");
             }
 
         } catch (java.lang.Exception e) {

@@ -85,5 +85,37 @@ public class ManejadorDatos {
         }
     }
 
+    public String obtenerLugarVotacion(String documento) throws SQLException {
+        String sql = 
+            "SELECT " +
+            "    p.nombre AS puesto_nombre, " +
+            "    p.direccion, " +
+            "    m.nombre AS municipio_nombre, " +
+            "    d.nombre AS departamento_nombre, " +
+            "    mv.consecutive AS mesa " +
+            "FROM ciudadano c " +
+            "JOIN mesa_votacion mv ON c.mesa_id = mv.id " +
+            "JOIN puesto_votacion p ON mv.puesto_id = p.id " +
+            "JOIN municipio m ON p.municipio_id = m.id " +
+            "JOIN departamento d ON m.departamento_id = d.id " +
+            "WHERE c.documento = ?";
+
+        try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
+            stmt.setString(1, documento);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return "Usted debe votar en " +
+                        rs.getString("puesto_nombre") + " ubicado en " +
+                        rs.getString("direccion") + ", " +
+                        rs.getString("municipio_nombre") + ", " +
+                        rs.getString("departamento_nombre") +
+                        " en la mesa " + rs.getInt("mesa") + ".";
+            } else {
+                return null;
+            }
+        }
+    }
+
+
 
 }
