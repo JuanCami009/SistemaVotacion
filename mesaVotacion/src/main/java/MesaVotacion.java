@@ -6,7 +6,7 @@ public class MesaVotacion {
     public static void main(String[] args) {
         try (Communicator communicator = Util.initialize(args)) {
             // Conectarse al cliente que está escuchando en el puerto 10000
-            ObjectPrx base = communicator.stringToProxy("client:tcp -h localhost -p 10000");
+            ObjectPrx base = communicator.stringToProxy("LugarVotacion:tcp -h localhost -p 10000");
             MesaPrx cliente = MesaPrx.checkedCast(base);
 
             if (cliente == null) {

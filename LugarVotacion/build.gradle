@@ -1,6 +1,6 @@
 slice {
     java {
-        files = [file("Client.ice")]
+        files = [file("lugarVotacion.ice")]
     }
 }
 

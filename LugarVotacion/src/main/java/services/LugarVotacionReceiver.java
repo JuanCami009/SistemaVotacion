@@ -6,11 +6,11 @@ import com.zeroc.Ice.Current;
 import model.Message;
 import reliableMessage.RMSourcePrx;
 
-public class ClientReceiver implements Mesa {
+public class LugarVotacionReceiver implements Mesa {
 
     private final RMSourcePrx rm;
 
-    public ClientReceiver(RMSourcePrx rm) {
+    public LugarVotacionReceiver(RMSourcePrx rm) {
         this.rm = rm;
     }
 

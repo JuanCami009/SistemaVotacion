@@ -1,4 +1,4 @@
-module client {
+module lugarVotacion {
 
     struct Voto {
         int idVoto;
