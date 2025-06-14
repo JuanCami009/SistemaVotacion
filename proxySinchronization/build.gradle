@@ -1,11 +1,12 @@
-
 repositories {
     mavenCentral()
 }
 
+
 dependencies {
     implementation 'com.zeroc:ice:3.7.2'
-    implementation project(':lugarVotacion')
+    implementation project(':reliableServer')  // contiene reliableMessage, model, communication, threads
+    implementation project(':broker')          // contiene broker.BrokerServicePrx
 }
 
 jar {

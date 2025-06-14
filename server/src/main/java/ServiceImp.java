@@ -29,7 +29,8 @@ public class ServiceImp implements RMDestination {
         }
 
         System.out.println("Procesando voto id: " + msg.idVoto);
-        System.out.println("Cantidad de votos recibidos: "+ contadorExito++);
+        contadorExito++;
+        System.out.println("Cantidad de votos recibidos: " + contadorExito);
         prx.ack(rmessage.getUuid());
     }
 }

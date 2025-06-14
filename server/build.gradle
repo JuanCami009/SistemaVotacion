@@ -1,11 +1,13 @@
-slice {
-    java {
-        files = [file("Service.ice")]
-    }
-}
 repositories {
     mavenCentral()
 }
+
+slice {
+    java {
+        files = [file("../reliableServer/ReliableMessage.ice")]
+    }
+}
+
 
 dependencies{
     implementation 'com.zeroc:ice:3.7.2'

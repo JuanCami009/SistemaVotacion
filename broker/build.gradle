@@ -1,11 +1,16 @@
+slice {
+    java {
+        files = [file("broker.ice")]
+    }
+}
 
 repositories {
     mavenCentral()
 }
 
+
 dependencies {
     implementation 'com.zeroc:ice:3.7.2'
-    implementation project(':lugarVotacion')
 }
 
 jar {

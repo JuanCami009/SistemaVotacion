@@ -10,5 +10,7 @@ rootProject.name = 'reliable-message-example'
 
 include('reliableServer')
 include('server')
-include('client')
+include('lugarVotacion')
 include ('mesaVotacion')
+include ('broker')
+include ('proxySinchronization')
