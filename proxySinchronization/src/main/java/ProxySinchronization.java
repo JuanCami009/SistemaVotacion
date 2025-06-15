@@ -25,25 +25,27 @@ public class ProxySinchronization {
             // Notificación entre receptor y emisor (para reenviar y confirmar mensajes)
             Notification notification = new Notification();
 
-            // Hilo de reintentos confiables
+            // Hilo de reintentos confiables (para mensajes hacia el servidor)
             RMJob job = new RMJob(notification);
             job.start();
 
             // Servicio receptor (ACK desde servidor)
             ProxySyncReceiver receiver = new ProxySyncReceiver(job);
 
-            // Servicio emisor (envía mensajes al servidor)
+            // ACTUALIZADO: Servicio emisor ahora implementa RMDestination
+            // para recibir mensajes confiables del LugarVotacion
             ProxySyncSender sender = new ProxySyncSender(job, notification);
 
             // Adaptador local para recibir conexiones con puerto dinámico
             ObjectAdapter adapter = communicator.createObjectAdapterWithEndpoints(
                 "ProxySyncAdapter", "tcp -h localhost -p " + puerto);
 
-            // Registrar objetos en el adaptador
-            ObjectPrx senderPrx = adapter.add(sender, Util.stringToIdentity("Sender")); // RMSource
+            // ACTUALIZADO: Registrar objetos en el adaptador
+            // sender ahora se registra como RMDestination para recibir del LugarVotacion
+            ObjectPrx senderPrx = adapter.add(sender, Util.stringToIdentity("RMDestination"));
             ObjectPrx ackPrx = adapter.add(receiver, Util.stringToIdentity("AckReceiver")); // ACKService
 
-            // Configurar ACK para ReliableMessaging
+            // Configurar ACK para ReliableMessaging interno (hacia servidor)
             notification.setAckService(ACKServicePrx.checkedCast(ackPrx));
 
             // Activar el adaptador
@@ -80,9 +82,10 @@ public class ProxySinchronization {
                 return;
             }
 
+            // ACTUALIZADO: Registrar como RMDestination (no RMSource)
             String proxyString = communicator.proxyToString(senderPrx);
             broker.registrarProxy(proxyId, proxyString);
-            System.out.println("ProxySync '" + proxyId + "' registrado en el broker.");
+            System.out.println("ProxySync '" + proxyId + "' registrado en el broker como RMDestination.");
 
             // Esperar señal de apagado
             System.out.println("ProxySynchronization '" + proxyId + "' activo en puerto " + puerto + " y listo.");
@@ -90,9 +93,6 @@ public class ProxySinchronization {
         }
     }
     
-    /**
-     * Encuentra un puerto disponible comenzando desde el puerto base
-     */
     private static int findAvailablePort(int basePort) {
         for (int port = basePort; port <= basePort + 1000; port++) {
             try (ServerSocket socket = new ServerSocket(port)) {

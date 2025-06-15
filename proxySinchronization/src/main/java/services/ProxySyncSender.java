@@ -3,11 +3,17 @@ package services;
 import com.zeroc.Ice.Current;
 import communication.Notification;
 import model.Message;
+import model.ReliableMessage;
 import reliableMessage.RMDestinationPrx;
-import reliableMessage.RMSource;
+import reliableMessage.RMDestination;
+import reliableMessage.ACKServicePrx;
 import threads.RMJob;
 
-public class ProxySyncSender implements RMSource {
+/**
+ * ProxySyncSender actualizado para enviar ACK inmediato al LugarVotacion
+ * cuando recibe un mensaje, y luego manejarlo internamente hacia el servidor
+ */
+public class ProxySyncSender implements RMDestination {
 
     private final RMJob job;
     private final Notification notification;
@@ -17,9 +23,25 @@ public class ProxySyncSender implements RMSource {
         this.notification = notification;
     }
 
+    /**
+     * NUEVO: Implementa RMDestination.reciveMessage para recibir mensajes confiables
+     * del LugarVotacion y enviar ACK inmediato
+     */
     @Override
-    public void sendMessage(Message msg, Current current) {
-        System.out.println("Mensaje recibido en ProxySync para reenviar al servidor central.");
+    public void reciveMessage(ReliableMessage rmessage, ACKServicePrx prx, Current current) {
+        System.out.println("Mensaje confiable recibido en ProxySync: " + rmessage.getUuid());
+        
+        // ENVIAR ACK INMEDIATO al LugarVotacion
+        try {
+            prx.ack(rmessage.getUuid());
+            System.out.println("ACK enviado inmediatamente al LugarVotacion para mensaje: " + rmessage.getUuid());
+        } catch (Exception e) {
+            System.err.println("Error enviando ACK al LugarVotacion: " + e.getMessage());
+        }
+        
+        // Ahora procesar el mensaje internamente
+        Message msg = rmessage.getMessage();
+        System.out.println("Agregando mensaje a cola interna del proxy para reenvío al servidor");
         job.add(msg);
     }
 
@@ -46,14 +68,6 @@ public class ProxySyncSender implements RMSource {
     }
 
     @Override
-    public void setServerProxy(RMDestinationPrx destination, Current current) {
-        // Este método ya no se usa porque el destino se configura directamente en ProxySynchronization
-        System.out.println("setServerProxy llamado, pero el destino ya está configurado.");
-    }
-
-
-    // Asegurarse que el método listarCandidatos está implementado
-    @Override
     public String listarCandidatos(Current current) {
         System.out.println("Solicitud de lista de candidatos recibida en ProxySync.");
         try {
@@ -67,5 +81,4 @@ public class ProxySyncSender implements RMSource {
             return "ERROR:" + e.getMessage();
         }
     }
-
 }
