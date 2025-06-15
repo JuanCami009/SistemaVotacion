@@ -5,6 +5,7 @@ import lugarVotacion.Voto;
 import lugarVotacion.ValidacionCedula;
 import lugarVotacion.Candidato;
 import com.zeroc.Ice.Current;
+import threads.LocalRetryJob;
 
 import java.util.Arrays;
 
@@ -21,30 +22,31 @@ public class LugarVotacionReceiver implements Mesa {
     private final Communicator communicator;
     private int contadorVotos = 0;
     private static final int REBALANCE_INTERVAL = 20;
+    private final LocalRetryJob retryJob;
 
     public LugarVotacionReceiver(BrokerServicePrx broker, String idLugar, Communicator communicator) {
         this.broker = broker;
         this.idLugar = idLugar;
         this.communicator = communicator;
-        
-        // Obtener proxy inicial
+
         this.rm = obtenerNuevoProxy();
+
+        this.retryJob = new LocalRetryJob(broker, idLugar);  // ← corregido
+        this.retryJob.start();
+        if (this.rm != null) {
+            this.retryJob.actualizarProxy(this.rm);
+        }
     }
 
     @Override
     public ValidacionCedula consultarCedula(String cedula, int mesaId, Current current) {
         System.out.println("Consulta de cédula recibida: " + cedula + " para mesa: " + mesaId);
-        
         ValidacionCedula resultado = new ValidacionCedula();
-        
+
         try {
             if (rm != null) {
-                // Llamar al proxy para validar la cédula
                 String respuesta = rm.consultarValidezCiudadano(cedula, mesaId);
-                
-                // Procesar la respuesta del servidor
                 procesarRespuestaValidacion(respuesta, resultado);
-                
                 System.out.println("Respuesta de validación: " + resultado.mensaje);
             } else {
                 resultado.esValida = false;
@@ -55,12 +57,12 @@ public class LugarVotacionReceiver implements Mesa {
             System.err.println("Error consultando cédula: " + e.getMessage());
             resultado.esValida = false;
             resultado.mensaje = "Error de conexión: " + e.getMessage();
-            
-            // Intentar obtener un nuevo proxy en caso de error
+
             System.out.println("Intentando obtener nuevo proxy debido a error...");
             RMSourcePrx nuevoProxy = obtenerNuevoProxy();
             if (nuevoProxy != null) {
                 this.rm = nuevoProxy;
+                this.retryJob.actualizarProxy(nuevoProxy);
                 try {
                     String respuesta = rm.consultarValidezCiudadano(cedula, mesaId);
                     procesarRespuestaValidacion(respuesta, resultado);
@@ -71,17 +73,16 @@ public class LugarVotacionReceiver implements Mesa {
                 }
             }
         }
-        
+
         return resultado;
     }
 
     private void procesarRespuestaValidacion(String respuesta, ValidacionCedula resultado) {
-        // Formato esperado: "VALIDA:mensaje" o "INVALIDA:mensaje" o "ERROR:mensaje"
         String[] partes = respuesta.split(":", 2);
         if (partes.length == 2) {
             String estado = partes[0];
             String mensaje = partes[1];
-            
+
             switch (estado) {
                 case "VALIDA":
                     resultado.esValida = true;
@@ -106,54 +107,38 @@ public class LugarVotacionReceiver implements Mesa {
     @Override
     public void enviarVoto(Voto voto, Current current) {
         System.out.println("Voto recibido: id " + voto.idVoto);
-        
-        // Incrementar contador y verificar si necesita rebalanceo
         contadorVotos++;
+
         if (contadorVotos % REBALANCE_INTERVAL == 0) {
             System.out.println("Realizando rebalanceo de proxy (voto #" + contadorVotos + ")");
             RMSourcePrx nuevoProxy = obtenerNuevoProxy();
             if (nuevoProxy != null) {
                 this.rm = nuevoProxy;
+                this.retryJob.actualizarProxy(nuevoProxy);
                 System.out.println("Proxy actualizado exitosamente");
             } else {
                 System.err.println("No se pudo obtener nuevo proxy, manteniendo el actual");
             }
         }
 
-        // Convertir Voto a Message incluyendo el idVoto explícitamente
         Message msg = new Message();
         msg.idVoto = voto.idVoto;
         msg.message = voto.idCandidato + "|" + voto.fecha;
 
-
         try {
             if (rm != null) {
                 rm.sendMessage(msg);
-                System.out.println("Voto #" + contadorVotos + " reenviado a reliable message.");
+                System.out.println("Voto #" + contadorVotos + " enviado exitosamente");
             } else {
-                System.err.println("No hay proxy disponible para enviar el voto");
+                System.out.println("Proxy no disponible, se encola el voto para reintento.");
+                retryJob.agregarMensaje(msg);
             }
         } catch (Exception e) {
-            System.err.println("Error reenviando voto: " + e.getMessage());
-            
-            // En caso de error, intentar obtener un nuevo proxy
-            System.out.println("Intentando obtener nuevo proxy debido a error...");
-            RMSourcePrx nuevoProxy = obtenerNuevoProxy();
-            if (nuevoProxy != null) {
-                this.rm = nuevoProxy;
-                try {
-                    rm.sendMessage(msg);
-                    System.out.println("Voto reenviado exitosamente con nuevo proxy.");
-                } catch (Exception e2) {
-                    System.err.println("Error crítico: No se pudo reenviar el voto incluso con nuevo proxy: " + e2.getMessage());
-                }
-            }
+            System.err.println("Error al enviar el voto, se encola para reintento: " + e.getMessage());
+            retryJob.agregarMensaje(msg);
         }
     }
-    
-    /**
-     * Obtiene un nuevo proxy del broker
-     */
+
     private RMSourcePrx obtenerNuevoProxy() {
         try {
             String proxyString = broker.obtenerProxy(idLugar);
@@ -164,12 +149,11 @@ public class LugarVotacionReceiver implements Mesa {
 
             System.out.println("Nuevo proxy obtenido del broker: " + proxyString);
             RMSourcePrx nuevoRm = RMSourcePrx.checkedCast(communicator.stringToProxy(proxyString));
-            
             if (nuevoRm == null) {
                 System.err.println("No se pudo obtener el proxy RMSource del ProxySync.");
                 return null;
             }
-            
+
             return nuevoRm;
         } catch (Exception e) {
             System.err.println("Error obteniendo nuevo proxy: " + e.getMessage());
@@ -177,31 +161,23 @@ public class LugarVotacionReceiver implements Mesa {
         }
     }
 
-
     @Override
     public Candidato[] obtenerCandidatos(Current current) {
         System.out.println("Solicitud de lista de candidatos recibida");
-        
+
         try {
-            if (rm == null) {
-                throw new RuntimeException("No hay conexión con el servidor");
-            }
-            
-            // Obtener la lista de candidatos como string formateado
+            if (rm == null) throw new RuntimeException("No hay conexión con el servidor");
+
             String candidatosStr = rm.listarCandidatos();
-            
             if (candidatosStr == null || candidatosStr.startsWith("ERROR:")) {
                 throw new RuntimeException(candidatosStr != null ? candidatosStr : "Respuesta vacía del servidor");
             }
-            
-            // Parsear el string en formato "id|nombre|partido;id|nombre|partido;..."
+
             return Arrays.stream(candidatosStr.split(";"))
                     .filter(s -> !s.isEmpty())
                     .map(s -> {
                         String[] partes = s.split("\\|");
-                        if (partes.length != 3) {
-                            throw new RuntimeException("Formato de candidato inválido: " + s);
-                        }
+                        if (partes.length != 3) throw new RuntimeException("Formato de candidato inválido: " + s);
                         Candidato c = new Candidato();
                         c.id = Integer.parseInt(partes[0]);
                         c.nombre = partes[1];
@@ -209,23 +185,21 @@ public class LugarVotacionReceiver implements Mesa {
                         return c;
                     })
                     .toArray(Candidato[]::new);
-                    
+
         } catch (Exception e) {
             System.err.println("Error obteniendo candidatos: " + e.getMessage());
-            
-            // Intentar obtener un nuevo proxy en caso de error
             System.out.println("Intentando obtener nuevo proxy debido a error...");
             RMSourcePrx nuevoProxy = obtenerNuevoProxy();
             if (nuevoProxy != null) {
                 this.rm = nuevoProxy;
+                this.retryJob.actualizarProxy(nuevoProxy);
                 try {
-                    // Reintentar con el nuevo proxy
                     return obtenerCandidatos(current);
                 } catch (Exception e2) {
                     throw new RuntimeException("Error crítico obteniendo candidatos: " + e2.getMessage());
                 }
             }
-            
+
             throw new RuntimeException("Error obteniendo lista de candidatos: " + e.getMessage());
         }
     }
