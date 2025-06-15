@@ -50,4 +50,22 @@ public class ProxySyncSender implements RMSource {
         // Este método ya no se usa porque el destino se configura directamente en ProxySynchronization
         System.out.println("setServerProxy llamado, pero el destino ya está configurado.");
     }
+
+
+    // Asegurarse que el método listarCandidatos está implementado
+    @Override
+    public String listarCandidatos(Current current) {
+        System.out.println("Solicitud de lista de candidatos recibida en ProxySync.");
+        try {
+            RMDestinationPrx destination = notification.getService();
+            if (destination != null) {
+                return destination.listarCandidatos();
+            } else {
+                return "ERROR:Sin conexión al servidor.";
+            }
+        } catch (Exception e) {
+            return "ERROR:" + e.getMessage();
+        }
+    }
+
 }

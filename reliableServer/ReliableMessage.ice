@@ -1,5 +1,4 @@
-module reliableMessage{
-
+module reliableMessage {
     ["java:serializable:model.ReliableMessage"]
     sequence<byte> RMessage;
     ["java:serializable:model.Message"]
@@ -13,10 +12,12 @@ module reliableMessage{
     interface RMDestination{
         void reciveMessage(RMessage rmessage, ACKService* prx);
         string consultarValidezCiudadano(string cedula, int mesaId);
+        string listarCandidatos();  // Cambiado de ListaCandidatos a string
     }
     interface RMSource{
         void setServerProxy(RMDestination* destination);
         void sendMessage(Message msg);
         string consultarValidezCiudadano(string cedula, int mesaId);
+        string listarCandidatos();  // Cambiado de ListaCandidatos a string
     }
 }

@@ -35,6 +35,10 @@ public class RMSender implements RMSource{
         return "ERROR: Método no implementado en RMSender";
     }
 
-
+    @Override
+    public String listarCandidatos(Current current) {
+        System.err.println("Método listarCandidatos no implementado en RMSender");
+        return "ERROR: Método no implementado en RMSender";
+    }
     
 }

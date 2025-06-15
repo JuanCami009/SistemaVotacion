@@ -3,7 +3,11 @@ package services;
 import lugarVotacion.Mesa;
 import lugarVotacion.Voto;
 import lugarVotacion.ValidacionCedula;
+import lugarVotacion.Candidato;
 import com.zeroc.Ice.Current;
+
+import java.util.Arrays;
+
 import com.zeroc.Ice.Communicator;
 import model.Message;
 import reliableMessage.RMSourcePrx;
@@ -119,7 +123,8 @@ public class LugarVotacionReceiver implements Mesa {
         // Convertir Voto a Message incluyendo el idVoto explícitamente
         Message msg = new Message();
         msg.idVoto = voto.idVoto;
-        msg.message = "Voto id: " + voto.idVoto + " desde " + idLugar;
+        msg.message = voto.idCandidato + "|" + voto.fecha;
+
 
         try {
             if (rm != null) {
@@ -169,6 +174,59 @@ public class LugarVotacionReceiver implements Mesa {
         } catch (Exception e) {
             System.err.println("Error obteniendo nuevo proxy: " + e.getMessage());
             return null;
+        }
+    }
+
+
+    @Override
+    public Candidato[] obtenerCandidatos(Current current) {
+        System.out.println("Solicitud de lista de candidatos recibida");
+        
+        try {
+            if (rm == null) {
+                throw new RuntimeException("No hay conexión con el servidor");
+            }
+            
+            // Obtener la lista de candidatos como string formateado
+            String candidatosStr = rm.listarCandidatos();
+            
+            if (candidatosStr == null || candidatosStr.startsWith("ERROR:")) {
+                throw new RuntimeException(candidatosStr != null ? candidatosStr : "Respuesta vacía del servidor");
+            }
+            
+            // Parsear el string en formato "id|nombre|partido;id|nombre|partido;..."
+            return Arrays.stream(candidatosStr.split(";"))
+                    .filter(s -> !s.isEmpty())
+                    .map(s -> {
+                        String[] partes = s.split("\\|");
+                        if (partes.length != 3) {
+                            throw new RuntimeException("Formato de candidato inválido: " + s);
+                        }
+                        Candidato c = new Candidato();
+                        c.id = Integer.parseInt(partes[0]);
+                        c.nombre = partes[1];
+                        c.partido = partes[2];
+                        return c;
+                    })
+                    .toArray(Candidato[]::new);
+                    
+        } catch (Exception e) {
+            System.err.println("Error obteniendo candidatos: " + e.getMessage());
+            
+            // Intentar obtener un nuevo proxy en caso de error
+            System.out.println("Intentando obtener nuevo proxy debido a error...");
+            RMSourcePrx nuevoProxy = obtenerNuevoProxy();
+            if (nuevoProxy != null) {
+                this.rm = nuevoProxy;
+                try {
+                    // Reintentar con el nuevo proxy
+                    return obtenerCandidatos(current);
+                } catch (Exception e2) {
+                    throw new RuntimeException("Error crítico obteniendo candidatos: " + e2.getMessage());
+                }
+            }
+            
+            throw new RuntimeException("Error obteniendo lista de candidatos: " + e.getMessage());
         }
     }
 }

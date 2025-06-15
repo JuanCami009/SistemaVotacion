@@ -1,5 +1,7 @@
+import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import com.zeroc.Ice.Current;
 
@@ -7,6 +9,7 @@ import db.ConexionBD;
 import db.ManejadorDatos;
 import model.Message;
 import model.ReliableMessage;
+import model.Voto;
 import reliableMessage.ACKServicePrx;
 import reliableMessage.RMDestination;
 
@@ -23,7 +26,6 @@ public class ServiceImp implements RMDestination {
         if (!votosProcesados.add(msg.idVoto)) {
             System.out.println("Duplicado detectado para voto id: " + msg.idVoto);
             System.out.println("Contador Duplicados: " + contadorDuplicado++);
-            
             prx.ack(rmessage.getUuid());
             return;
         }
@@ -31,8 +33,44 @@ public class ServiceImp implements RMDestination {
         System.out.println("Procesando voto id: " + msg.idVoto);
         contadorExito++;
         System.out.println("Cantidad de votos recibidos: " + contadorExito);
+
+        try {
+            // Parsear el contenido: idCandidato|fechaISO8601
+            String[] partes = msg.message.split("\\|");
+            if (partes.length != 2) {
+                System.err.println("Formato inválido de mensaje: " + msg.message);
+                prx.ack(rmessage.getUuid());
+                return;
+            }
+
+            int idCandidato = Integer.parseInt(partes[0]);
+            LocalDateTime fecha = LocalDateTime.parse(partes[1]);  // ✅ esta es la corrección clave
+
+            Voto voto = new Voto(0, idCandidato, fecha);
+
+            // Guardar en BD
+            ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
+            String conexionError = connBD.conectarBaseDatos();
+            if (conexionError != null) {
+                System.err.println("Error de conexión BD: " + conexionError);
+                prx.ack(rmessage.getUuid());
+                return;
+            }
+
+            ManejadorDatos manejador = new ManejadorDatos(connBD.getConnection());
+            manejador.registrarVoto(voto);
+
+            System.out.println("Voto registrado en la base de datos: Candidato " + idCandidato + ", Fecha " + fecha);
+            connBD.cerrarConexion();
+
+        } catch (Exception e) {
+            System.err.println("Error al procesar y registrar voto: " + e.getMessage());
+            e.printStackTrace();
+        }
+
         prx.ack(rmessage.getUuid());
     }
+
 
     @Override
     public String consultarValidezCiudadano(String cedula, int mesaId, Current current) {
@@ -55,7 +93,7 @@ public class ServiceImp implements RMDestination {
                 return "INVALIDA:Ciudadano no registrado en el sistema";
             }
             
-            // Validación 2: ¿Es su mesa asignada?
+            //Validación 2: ¿Es su mesa asignada?
             if (!manejador.esSuMesa(cedula, mesaId)) {
                 System.out.println("Mesa incorrecta para ciudadano: " + cedula);
                 String lugarCorrect = manejador.obtenerLugarVotacion(cedula);
@@ -79,4 +117,24 @@ public class ServiceImp implements RMDestination {
             connBD.cerrarConexion();
         }
     }
+
+   // Modificar el método listarCandidatos existente
+    @Override
+    public String listarCandidatos(Current current) {
+        ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
+        connBD.conectarBaseDatos();
+        ManejadorDatos manejador = new ManejadorDatos(connBD.getConnection());
+        try {
+            return manejador.listarCandidatos()
+                    .stream()
+                    .map(c -> c.getId() + "|" + c.getNombre() + "|" + c.getPartidoPolitico())
+                    .collect(Collectors.joining(";"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "ERROR:" + e.getMessage();
+        } finally {
+            connBD.cerrarConexion();
+        }
+    }
+
 }

@@ -14,7 +14,7 @@ slice {
 dependencies {
     implementation 'com.zeroc:ice:3.7.2'
     implementation project(':reliableServer')
-    implementation 'org.postgresql:postgresql:42.3.1'
+    implementation 'org.postgresql:postgresql:42.7.1'
 }
 
 jar {
