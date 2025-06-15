@@ -7,7 +7,6 @@ import reliableMessage.ACKServicePrx;
 public class Notification {
 
     private RMDestinationPrx service;
-
     private ACKServicePrx ackService;
 
     public void setAckService(ACKServicePrx ackService) {
@@ -16,6 +15,10 @@ public class Notification {
 
     public void setService(RMDestinationPrx service) {
         this.service = service;
+    }
+
+    public RMDestinationPrx getService() {
+        return service;
     }
 
     public void sendMessage(ReliableMessage message){

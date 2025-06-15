@@ -29,6 +29,12 @@ public class RMSender implements RMSource{
         notification.setService(destination);
     }
 
+    @Override
+    public String consultarValidezCiudadano(String cedula, int mesaId, Current current) {
+        System.err.println("Método consultarValidezCiudadano no implementado en RMSender");
+        return "ERROR: Método no implementado en RMSender";
+    }
+
 
     
 }

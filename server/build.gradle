@@ -1,25 +1,49 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+    id 'com.zeroc.gradle.ice-builder.slice' version '1.5.0'
+}
+
 repositories {
     mavenCentral()
 }
 
 slice {
     java {
-        files = [file("../reliableServer/ReliableMessage.ice")]
+        files = [
+            file("../reliableServer/ReliableMessage.ice"),
+            file("Service.ice") // <-- Ice con interfaces VoteStation, QueryStation
+        ]
     }
 }
 
-
-dependencies{
+dependencies {
     implementation 'com.zeroc:ice:3.7.2'
-
     implementation project(':reliableServer')
+    implementation 'org.postgresql:postgresql:42.3.1'
 }
 
-jar {
-        manifest {
-            attributes(
-                "Main-Class": project.name.capitalize(),
-                "Class-Path": configurations.runtimeClasspath.resolve().collect { it.toURI() }.join(' ')
-            )
-        }
+application {
+    mainClass = 'Server'
+}
+
+// Configuración para generar un fat JAR ejecutable
+shadowJar {
+    archiveBaseName.set('server')       // Nombre del archivo
+    archiveClassifier.set('')           // Sin sufijo adicional
+    archiveVersion.set('')              // Sin versión en el nombre del jar
+    manifest {
+        attributes 'Main-Class': 'Server' // Clase principal del proyecto
     }
+}
+
+// También puedes dejar este como opción si quieres ejecutar sin empaquetar todo
+jar {
+    manifest {
+        attributes(
+            "Main-Class": project.name.capitalize(),
+            "Class-Path": configurations.runtimeClasspath.resolve().collect { it.toURI() }.join(' ')
+        )
+    }
+}
