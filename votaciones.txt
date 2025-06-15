@@ -1,0 +1,2357 @@
+Buscando carpetas con código fuente...
+--------------------------------------------------------------
+
+📁 Carpeta procesada: ./mesaVotacion/src
+Estructura completa:
+./mesaVotacion/src
+└── main
+    └── java
+        └── MesaVotacion.java
+
+3 directories, 1 file
+
+🧾 Archivos de código en ./mesaVotacion/src (con contenido):
+
+./mesaVotacion/src/main/java/MesaVotacion.java
+
+import lugarVotacion.MesaPrx;
+import lugarVotacion.Voto;
+import lugarVotacion.ValidacionCedula;
+import lugarVotacion.Candidato; // Nueva importación
+import com.zeroc.Ice.*;
+import java.util.Scanner;
+
+public class MesaVotacion {
+    public static void main(String[] args) {
+        try (Communicator communicator = Util.initialize(args)) {
+            
+            // Permitir configurar el puerto del lugar de votación objetivo
+            String lugarHost = System.getProperty("lugar.host", "localhost");
+            String lugarPort = System.getProperty("lugar.port", "10000");
+            String instanceId = System.getProperty("instance.id", "default");
+            
+            System.out.println("Mesa de votación (instancia: " + instanceId + ") conectando a " + lugarHost + ":" + lugarPort);
+            
+            // Conectarse al lugar de votación especificado
+            ObjectPrx base = communicator.stringToProxy("LugarVotacion:tcp -h " + lugarHost + " -p " + lugarPort);
+            MesaPrx cliente = MesaPrx.checkedCast(base);
+
+            if (cliente == null) {
+                System.err.println("No se pudo obtener el proxy del lugar de votación en " + lugarHost + ":" + lugarPort);
+                return;
+            }
+
+            // Configuración para modo automático o interactivo
+            boolean modoAutomatico = Boolean.parseBoolean(System.getProperty("modo.automatico", "true"));
+            int mesaId = Integer.parseInt(System.getProperty("mesa.id", "1"));
+            
+            if (modoAutomatico) {
+                // Modo automático para pruebas (como antes)
+                ejecutarModoAutomatico(cliente, instanceId, mesaId);
+            } else {
+                // Modo interactivo para uso real
+                ejecutarModoInteractivo(cliente, mesaId);
+            }
+            
+        } catch (java.lang.Exception e) {
+            System.err.println("Error en mesa de votacion: " + e.getMessage());
+        }
+    }
+    
+    private static void ejecutarModoAutomatico(MesaPrx cliente, String instanceId, int mesaId) {
+        // Obtener configuración de votos a enviar
+        int cantidadVotos = Integer.parseInt(System.getProperty("votos.cantidad", "25"));
+        int delayMs = Integer.parseInt(System.getProperty("votos.delay", "1000"));
+        
+        System.out.println("Enviando " + cantidadVotos + " votos con delay de " + delayMs + "ms");
+
+        // Enviar múltiples votos con delay para probar el rebalanceo
+        for (int i = 1; i <= cantidadVotos; i++) {
+            Voto voto = new Voto();
+            int baseId = 1000 * Integer.parseInt(instanceId.replaceAll("\\D+", ""));
+            voto.idVoto = baseId + i;  // Ejemplo: mesa1 → 1001, 1002... | mesa2 → 2001, 2002...
+            
+            try {
+                cliente.enviarVoto(voto);
+                System.out.println("Voto " + i + "/" + cantidadVotos + " enviado (ID: " + voto.idVoto + ")");
+                
+                // Delay entre votos
+                if (i < cantidadVotos) {
+                    Thread.sleep(delayMs);
+                }
+            } catch (java.lang.Exception e) {
+                System.err.println("Error enviando voto " + i + ": " + e.getMessage());
+            }
+        }
+        
+        System.out.println("Mesa de votacion (instancia: " + instanceId + ") completo el envio de votos.");
+    }
+    
+    private static void ejecutarModoInteractivo(MesaPrx cliente, int mesaId) {
+        Scanner scanner = new Scanner(System.in);
+        String instanceId = System.getProperty("instance.id", "1");
+        int baseId = 1000 * Integer.parseInt(instanceId.replaceAll("\\D+", ""));
+        int contadorVotos = 1;
+
+        System.out.println("=== MODO INTERACTIVO UNIFICADO ===");
+
+        while (true) {
+            System.out.print("\nIngrese su número de cédula (o escriba 'salir' para terminar): ");
+            String cedula = scanner.nextLine().trim();
+            if (cedula.equalsIgnoreCase("salir")) break;
+
+            if (cedula.isEmpty()) {
+                System.out.println("⚠️ Cédula no puede estar vacía");
+                continue;
+            }
+
+            try {
+                // Validar cédula
+                System.out.println("Mesa id prueba: "+ mesaId);
+                ValidacionCedula validacion = cliente.consultarCedula(cedula, mesaId);
+
+                if (!validacion.esValida) {
+                    System.out.println("No autorizado para votar: " + validacion.mensaje);
+                    continue;
+                }
+
+                // Mostrar candidatos
+                System.out.println("\nValidación exitosa. Mostrando candidatos:");
+                Candidato[] candidatos = cliente.obtenerCandidatos();
+
+                for (Candidato c : candidatos) {
+                    System.out.printf("%d. %s (%s)\n", c.id, c.nombre, c.partido);
+                }
+
+                System.out.print("Seleccione el ID del candidato: ");
+                int idCandidato = scanner.nextInt();
+                scanner.nextLine(); // limpiar buffer
+
+                // Crear y enviar voto
+                Voto voto = new Voto();
+                voto.idVoto = baseId + contadorVotos++;
+                voto.idCandidato = idCandidato;
+                voto.fecha = java.time.LocalDateTime.now().toString();
+
+                cliente.enviarVoto(voto);
+                System.out.println("Voto enviado correctamente con ID: " + voto.idVoto);
+
+            } catch (java.lang.Exception e) {
+                System.err.println("Error en el proceso de votación: " + e.getMessage());
+                scanner.nextLine(); // limpiar en caso de error con nextInt
+            }
+        }
+
+        System.out.println("Gracias por usar la mesa de votación.");
+    }
+
+    
+   
+}
+--------------------------------------------------
+
+
+📁 Carpeta procesada: ./reliableServer/src
+Estructura completa:
+./reliableServer/src
+└── main
+    ├── java
+    │   ├── communication
+    │   │   └── Notification.java
+    │   ├── model
+    │   │   ├── ConsultaCedula.java
+    │   │   ├── Message.java
+    │   │   └── ReliableMessage.java
+    │   ├── ReliableServer.java
+    │   ├── services
+    │   │   ├── RMReciever.java
+    │   │   └── RMSender.java
+    │   └── threads
+    │       └── RMJob.java
+    └── resources
+        └── rmservice.config
+
+8 directories, 9 files
+
+🧾 Archivos de código en ./reliableServer/src (con contenido):
+
+./reliableServer/src/main/java/ReliableServer.java
+
+import com.zeroc.Ice.Communicator;
+import com.zeroc.Ice.ObjectAdapter;
+import com.zeroc.Ice.ObjectPrx;
+import com.zeroc.Ice.Util;
+
+import communication.Notification;
+import reliableMessage.ACKServicePrx;
+import services.RMReciever;
+import services.RMSender;
+import threads.RMJob;
+
+public class ReliableServer {
+    
+    public static void main(String[] args) {
+        Communicator communicator = Util.initialize(args, "rmservice.config");
+
+        Notification notification = new Notification();
+        RMJob job = new RMJob(notification);
+        RMReciever rec = new RMReciever(job);
+        RMSender sender = new RMSender(job, notification);
+
+        ObjectAdapter adapter = communicator.createObjectAdapter("RMService");
+        adapter.add(sender, Util.stringToIdentity("Sender"));
+        ObjectPrx prx = adapter.add(rec, Util.stringToIdentity("AckCallback"));
+        notification.setAckService(ACKServicePrx.checkedCast(prx));
+        adapter.activate();
+        job.start();
+
+        communicator.waitForShutdown();
+        
+    }
+
+    
+}
+
+--------------------------------------------------
+
+
+./reliableServer/src/main/java/communication/Notification.java
+
+package communication;
+
+import model.ReliableMessage;
+import reliableMessage.RMDestinationPrx;
+import reliableMessage.ACKServicePrx;
+
+public class Notification {
+
+    private RMDestinationPrx service;
+    private ACKServicePrx ackService;
+
+    public void setAckService(ACKServicePrx ackService) {
+        this.ackService = ackService;
+    }
+
+    public void setService(RMDestinationPrx service) {
+        this.service = service;
+    }
+
+    public RMDestinationPrx getService() {
+        return service;
+    }
+
+    public void sendMessage(ReliableMessage message){
+        service.reciveMessage(message, ackService);
+    }
+}
+--------------------------------------------------
+
+
+./reliableServer/src/main/java/model/Message.java
+
+package model;
+
+import java.io.Serializable;
+
+public class Message implements Serializable {
+    public String message;
+    public int idVoto; // nuevo campo explícito para identificar el voto
+}
+
+--------------------------------------------------
+
+
+./reliableServer/src/main/java/model/ReliableMessage.java
+
+package model;
+
+import java.io.Serializable;
+
+public class ReliableMessage implements Serializable{
+    
+    private String uuid;
+    private long numberMessage;
+    private String state;
+
+    private Message message;
+
+    public ReliableMessage(String uuid, long numberMessage, String state, Message message) {
+        this.uuid = uuid;
+        this.numberMessage = numberMessage;
+        this.state = state;
+        this.message = message;
+    }
+
+    public String getUuid() {
+        return uuid;
+    }
+
+    public void setUuid(String uuid) {
+        this.uuid = uuid;
+    }
+
+    public long getNumberMessage() {
+        return numberMessage;
+    }
+
+    public void setNumberMessage(long numberMessage) {
+        this.numberMessage = numberMessage;
+    }
+
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
+    public Message getMessage() {
+        return message;
+    }
+
+    public void setMessage(Message message) {
+        this.message = message;
+    }
+    
+    
+    
+    
+}
+
+--------------------------------------------------
+
+
+./reliableServer/src/main/java/model/ConsultaCedula.java
+
+package model;
+
+import java.io.Serializable;
+
+public class ConsultaCedula implements Serializable {
+    public String cedula;
+    public int mesaId;
+    public String tipoConsulta; // "VALIDACION_CEDULA"
+    
+    public ConsultaCedula() {}
+    
+    public ConsultaCedula(String cedula, int mesaId) {
+        this.cedula = cedula;
+        this.mesaId = mesaId;
+        this.tipoConsulta = "VALIDACION_CEDULA";
+    }
+}
+--------------------------------------------------
+
+
+./reliableServer/src/main/java/services/RMReciever.java
+
+package services;
+
+import com.zeroc.Ice.Current;
+
+import reliableMessage.ACKService;
+import threads.RMJob;
+
+public class  RMReciever implements  ACKService {
+
+    private RMJob jobM;
+
+    
+
+    public RMReciever(RMJob job) {
+        this.jobM = job;
+    }
+
+    @Override
+    public void ack(String messageId, Current current) {
+        jobM.confirmMessage(messageId);
+    }
+
+    
+    
+}
+
+--------------------------------------------------
+
+
+./reliableServer/src/main/java/services/RMSender.java
+
+package services;
+
+import com.zeroc.Ice.Current;
+
+import communication.Notification;
+import model.Message;
+import reliableMessage.RMDestinationPrx;
+import reliableMessage.RMSource;
+import threads.RMJob;
+
+public class RMSender implements RMSource{
+
+    private RMJob jobM;
+    private Notification notification;
+
+    
+    public RMSender(RMJob job, Notification not) {
+        notification = not;
+        jobM = job;
+    }
+
+
+    @Override
+    public void sendMessage(Message msg, Current current) {
+        jobM.add(msg);
+    }
+    @Override
+    public void setServerProxy(RMDestinationPrx destination, Current current){
+        notification.setService(destination);
+    }
+
+    @Override
+    public String consultarValidezCiudadano(String cedula, int mesaId, Current current) {
+        System.err.println("Método consultarValidezCiudadano no implementado en RMSender");
+        return "ERROR: Método no implementado en RMSender";
+    }
+
+    @Override
+    public String listarCandidatos(Current current) {
+        System.err.println("Método listarCandidatos no implementado en RMSender");
+        return "ERROR: Método no implementado en RMSender";
+    }
+    
+}
+
+--------------------------------------------------
+
+
+./reliableServer/src/main/java/threads/RMJob.java
+
+    package threads;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+import communication.Notification;
+import model.Message;
+import model.ReliableMessage;
+
+public class RMJob extends Thread{
+
+    public static final String PENDING = "Pending";
+    public static final String SENDED = "Sended";
+
+    private Map<String,ReliableMessage> messagesPendig = new ConcurrentHashMap<>();
+    private Map<String,ReliableMessage> forConfirm = new ConcurrentHashMap<>();
+
+
+    private Long sequenceNumber = 0l;
+    private Object lock = new Object();
+    private boolean enable = true;
+    private Notification notification;
+
+    public RMJob(Notification notification) {
+        this.notification = notification;
+    }
+
+    public void add(Message message){
+        synchronized (lock) {
+            ReliableMessage mes = new ReliableMessage(UUID.randomUUID().toString(), sequenceNumber++, PENDING, message);
+            messagesPendig.put(mes.getUuid(),mes);
+        }
+    }
+
+    public void confirmMessage(String uid){
+        forConfirm.remove(uid);
+    }
+
+    public void setEnable(boolean enable) {
+        this.enable = enable;
+    }
+
+    @Override
+    public void run(){
+        while (enable) { 
+            System.out.println("cicle");
+            for(Map.Entry<String,ReliableMessage> rm: messagesPendig.entrySet()){
+                try {
+                    System.out.println("Sendig messge");
+                    notification.sendMessage(rm.getValue());
+                    messagesPendig.remove(rm.getKey());
+                    forConfirm.put(rm.getKey(), rm.getValue());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            try {
+                Thread.sleep(10000);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+--------------------------------------------------
+
+
+./reliableServer/src/main/resources/rmservice.config
+
+RMService.Endpoints=tcp -h localhost -p 10010
+--------------------------------------------------
+
+
+📁 Carpeta procesada: ./server/src
+Estructura completa:
+./server/src
+└── main
+    ├── java
+    │   ├── db
+    │   │   ├── ConexionBD.java
+    │   │   └── ManejadorDatos.java
+    │   ├── model
+    │   │   ├── Candidato.java
+    │   │   ├── Ciudadano.java
+    │   │   ├── CiudadanoVoto.java
+    │   │   ├── Departamento.java
+    │   │   ├── MesaVotacion.java
+    │   │   ├── Municipio.java
+    │   │   ├── PuestoVotacion.java
+    │   │   └── Voto.java
+    │   ├── Server.java
+    │   ├── ServiceImp.java
+    │   └── services
+    │       ├── QueryStationImpl.java
+    │       └── VoteStationImpl.java
+    └── resources
+        └── server.config
+
+7 directories, 15 files
+
+🧾 Archivos de código en ./server/src (con contenido):
+
+./server/src/main/java/Server.java
+
+import com.zeroc.Ice.Communicator;
+import com.zeroc.Ice.ObjectAdapter;
+import com.zeroc.Ice.Util;
+
+public class Server {
+    public static void main(String[] args) {
+    System.out.println("Iniciando servidor...");
+    System.out.println("Cargando configuración desde: server.config");
+    
+    Communicator com = Util.initialize(args, "server.config");
+    System.out.println("Communicator inicializado");
+    
+    ServiceImp imp = new ServiceImp();
+    ObjectAdapter adapter = com.createObjectAdapterWithEndpoints("Server", "tcp -h localhost -p 10012");
+    
+    System.out.println("Registrando servant como RMDestination...");
+    adapter.add(imp, Util.stringToIdentity("RMDestination"));
+    
+    adapter.activate();
+    System.out.println("Servidor Central iniciado y esperando mensajes confiables en tcp://localhost:10012");
+    com.waitForShutdown();
+}
+}
+--------------------------------------------------
+
+
+./server/src/main/java/ServiceImp.java
+
+import java.time.LocalDateTime;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
+import com.zeroc.Ice.Current;
+
+import db.ConexionBD;
+import db.ManejadorDatos;
+import model.Message;
+import model.ReliableMessage;
+import model.Voto;
+import reliableMessage.ACKServicePrx;
+import reliableMessage.RMDestination;
+
+public class ServiceImp implements RMDestination {
+
+    private Set<Integer> votosProcesados = ConcurrentHashMap.newKeySet();
+    public int contadorExito = 0;
+    public int contadorDuplicado = 0;
+
+    @Override
+    public void reciveMessage(ReliableMessage rmessage, ACKServicePrx prx, Current current) {
+        Message msg = rmessage.getMessage();
+
+        if (!votosProcesados.add(msg.idVoto)) {
+            System.out.println("Duplicado detectado para voto id: " + msg.idVoto);
+            System.out.println("Contador Duplicados: " + contadorDuplicado++);
+            prx.ack(rmessage.getUuid());
+            return;
+        }
+
+        System.out.println("Procesando voto id: " + msg.idVoto);
+        contadorExito++;
+        System.out.println("Cantidad de votos recibidos: " + contadorExito);
+
+        try {
+            // Parsear el contenido: idCandidato|fechaISO8601
+            String[] partes = msg.message.split("\\|");
+            if (partes.length != 2) {
+                System.err.println("Formato inválido de mensaje: " + msg.message);
+                prx.ack(rmessage.getUuid());
+                return;
+            }
+
+            int idCandidato = Integer.parseInt(partes[0]);
+            LocalDateTime fecha = LocalDateTime.parse(partes[1]);  // ✅ esta es la corrección clave
+
+            Voto voto = new Voto(0, idCandidato, fecha);
+
+            // Guardar en BD
+            ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
+            String conexionError = connBD.conectarBaseDatos();
+            if (conexionError != null) {
+                System.err.println("Error de conexión BD: " + conexionError);
+                prx.ack(rmessage.getUuid());
+                return;
+            }
+
+            ManejadorDatos manejador = new ManejadorDatos(connBD.getConnection());
+            manejador.registrarVoto(voto);
+
+            System.out.println("Voto registrado en la base de datos: Candidato " + idCandidato + ", Fecha " + fecha);
+            connBD.cerrarConexion();
+
+        } catch (Exception e) {
+            System.err.println("Error al procesar y registrar voto: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        prx.ack(rmessage.getUuid());
+    }
+
+
+    @Override
+    public String consultarValidezCiudadano(String cedula, int mesaId, Current current) {
+        System.out.println("Consultando validez de ciudadano: " + cedula + " para mesa: " + mesaId);
+        
+        ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
+        String resultado = connBD.conectarBaseDatos();
+        
+        if (resultado != null) {
+            System.err.println("Error conectando a base de datos: " + resultado);
+            return "ERROR:Error de conexión a base de datos";
+        }
+        
+        ManejadorDatos manejador = new ManejadorDatos(connBD.getConnection());
+        
+        try {
+            // Validación 1: ¿Existe el ciudadano?
+            if (!manejador.existeCiudadano(cedula)) {
+                System.out.println("Ciudadano no encontrado: " + cedula);
+                return "INVALIDA:Ciudadano no registrado en el sistema";
+            }
+            
+            //Validación 2: ¿Es su mesa asignada?
+            if (!manejador.esSuMesa(cedula, mesaId)) {
+                System.out.println("Mesa incorrecta para ciudadano: " + cedula);
+                String lugarCorrect = manejador.obtenerLugarVotacion(cedula);
+                return "INVALIDA:No es su mesa asignada. " + lugarCorrect;
+            }
+            
+            // Validación 3: ¿Ya ha votado?
+            if (!manejador.registrarCiudadanoSiNoExiste(cedula)) {
+                System.out.println("Ciudadano ya votó: " + cedula);
+                return "INVALIDA:Ya has ejercido tu derecho al voto";
+            }
+            
+            System.out.println("Ciudadano válido para votar: " + cedula);
+            return "VALIDA:Ciudadano habilitado para votar";
+            
+        } catch (Exception e) {
+            System.err.println("Error procesando validación de ciudadano: " + e.getMessage());
+            e.printStackTrace();
+            return "ERROR:Error interno del servidor - " + e.getMessage();
+        } finally {
+            connBD.cerrarConexion();
+        }
+    }
+
+   // Modificar el método listarCandidatos existente
+    @Override
+    public String listarCandidatos(Current current) {
+        ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
+        connBD.conectarBaseDatos();
+        ManejadorDatos manejador = new ManejadorDatos(connBD.getConnection());
+        try {
+            return manejador.listarCandidatos()
+                    .stream()
+                    .map(c -> c.getId() + "|" + c.getNombre() + "|" + c.getPartidoPolitico())
+                    .collect(Collectors.joining(";"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "ERROR:" + e.getMessage();
+        } finally {
+            connBD.cerrarConexion();
+        }
+    }
+
+}
+--------------------------------------------------
+
+
+./server/src/main/java/db/ConexionBD.java
+
+package db;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import com.zeroc.Ice.Communicator;
+import com.zeroc.Ice.Properties;
+
+public class ConexionBD {
+
+	private Communicator com;
+	private Connection conexion;
+
+	public ConexionBD(Communicator com) {
+		this.com = com;
+	}
+
+	public String conectarBaseDatos() {
+    try {
+        Properties prop = com.getProperties();
+        System.out.println("Intentando conectar con: " + prop.getProperty("ConexionBD"));
+        
+        Class.forName("org.postgresql.Driver");
+        System.out.println("Driver PostgreSQL cargado correctamente");
+        
+        String cadenaconexionRemota = prop.getProperty("ConexionBD");
+        String usuario = prop.getProperty("usuarioBD");
+        String password = prop.getProperty("paswordBD");
+        
+        System.out.println("Conectando a: " + cadenaconexionRemota + " con usuario: " + usuario);
+        
+        conexion = DriverManager.getConnection(cadenaconexionRemota, usuario, password);
+        
+        if (conexion == null) {
+            return "No se pudo establecer la conexión";
+        }
+        System.out.println("Conexión establecida correctamente");
+        return null;
+    } catch (ClassNotFoundException e) {
+        return "Error: Driver PostgreSQL no encontrado: " + e.getMessage();
+    } catch (SQLException e) {
+        return "Error SQL al conectar: " + e.getMessage();
+    }
+}
+
+	public Connection getConnection() {
+		return conexion;
+	}
+
+	public void cerrarConexion() {
+		try {
+			conexion.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+	}
+}
+--------------------------------------------------
+
+
+./server/src/main/java/db/ManejadorDatos.java
+
+package db;
+
+import model.Candidato;
+import model.Voto;
+
+import java.sql.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ManejadorDatos {
+
+    private Connection conexion;
+
+    public ManejadorDatos(Connection conexion) {
+        this.conexion = conexion;
+    }
+
+
+    public void registrarVoto(Voto voto) throws SQLException {
+        String sql = "INSERT INTO voto (candidato, fecha_emision) VALUES (?, ?)";
+        try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
+            stmt.setInt(1, voto.getCandidatoId());
+            stmt.setTimestamp(2, Timestamp.valueOf(voto.getFechaEmision()));
+            stmt.executeUpdate();
+        }
+    }
+
+    public List<Candidato> listarCandidatos() throws SQLException {
+        List<Candidato> candidatos = new ArrayList<>();
+        String sql = "SELECT id, nombre, partido_politico FROM candidato";
+        try (Statement stmt = conexion.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                Candidato c = new Candidato(
+                        rs.getInt("id"),
+                        rs.getString("nombre"),
+                        rs.getString("partido_politico")
+                );
+                candidatos.add(c);
+            }
+        }
+        return candidatos;
+    }
+
+    public boolean registrarCiudadanoSiNoExiste(String documento) throws SQLException {
+        String checkSql = "SELECT 1 FROM ciudadano_voto WHERE documento = ?";
+        try (PreparedStatement checkStmt = conexion.prepareStatement(checkSql)) {
+            checkStmt.setString(1, documento);
+            ResultSet rs = checkStmt.executeQuery();
+            if (rs.next()) {
+                // El ciudadano ya votó
+                return false;
+            }
+        }
+
+        String insertSql = "INSERT INTO ciudadano_voto (documento, fecha_voto) VALUES (?, ?)";
+        try (PreparedStatement insertStmt = conexion.prepareStatement(insertSql)) {
+            insertStmt.setString(1, documento);
+            insertStmt.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
+            insertStmt.executeUpdate();
+            return true;
+        }
+    }
+
+    public boolean existeCiudadano(String documento) throws SQLException {
+        String sql = "SELECT 1 FROM ciudadano WHERE documento = ?";
+        try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
+            stmt.setString(1, documento);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+        }
+    }
+
+    public boolean esSuMesa(String documento, int mesaId) throws SQLException {
+        String sql = "SELECT mesa_id FROM ciudadano WHERE documento = ?";
+        try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
+            stmt.setString(1, documento);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                int mesaAsignada = rs.getInt("mesa_id");
+                return mesaAsignada == mesaId;
+            }
+            return false;
+        }
+    }
+
+    public String obtenerLugarVotacion(String documento) throws SQLException {
+        String sql = 
+            "SELECT " +
+            "    p.nombre AS puesto_nombre, " +
+            "    p.direccion, " +
+            "    m.nombre AS municipio_nombre, " +
+            "    d.nombre AS departamento_nombre, " +
+            "    mv.consecutive AS mesa " +
+            "FROM ciudadano c " +
+            "JOIN mesa_votacion mv ON c.mesa_id = mv.id " +
+            "JOIN puesto_votacion p ON mv.puesto_id = p.id " +
+            "JOIN municipio m ON p.municipio_id = m.id " +
+            "JOIN departamento d ON m.departamento_id = d.id " +
+            "WHERE c.documento = ?";
+
+        try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
+            stmt.setString(1, documento);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return "Usted debe votar en " +
+                        rs.getString("puesto_nombre") + " ubicado en " +
+                        rs.getString("direccion") + ", " +
+                        rs.getString("municipio_nombre") + ", " +
+                        rs.getString("departamento_nombre") +
+                        " en la mesa " + rs.getInt("mesa") + ".";
+            } else {
+                return null;
+            }
+        }
+    }
+
+
+
+}
+--------------------------------------------------
+
+
+./server/src/main/java/model/Candidato.java
+
+package model;
+
+public class Candidato {
+    private int id;
+    private String nombre;
+    private String partidoPolitico;
+
+    public Candidato() {}
+
+    public Candidato(int id, String nombre, String partidoPolitico) {
+        super();
+        this.id = id;
+        this.nombre = nombre;
+        this.partidoPolitico = partidoPolitico;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public String getNombre() {
+        return nombre;
+    }
+
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
+
+    public String getPartidoPolitico() {
+        return partidoPolitico;
+    }
+
+    public void setPartidoPolitico(String partidoPolitico) {
+        this.partidoPolitico = partidoPolitico;
+    }
+
+
+}
+--------------------------------------------------
+
+
+./server/src/main/java/model/Ciudadano.java
+
+package model;
+
+public class Ciudadano {
+    private int id;
+    private String documento;
+    private String nombre;
+    private String apellido;
+    private int mesaId;
+
+    public Ciudadano() {}
+    public Ciudadano(int id, String documento, String nombre, String apellido, int mesaId) {
+        super();
+        this.id = id;
+        this.documento = documento;
+        this.nombre = nombre;
+        this.apellido = apellido;
+        this.mesaId = mesaId;
+    }
+    public int getId() {
+        return id;
+    }
+    public void setId(int id) {
+        this.id = id;
+    }
+    public String getDocumento() {
+        return documento;
+    }
+    public void setDocumento(String documento) {
+        this.documento = documento;
+    }
+    public String getNombre() {
+        return nombre;
+    }
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
+    public String getApellido() {
+        return apellido;
+    }
+    public void setApellido(String apellido) {
+        this.apellido = apellido;
+    }
+    public int getMesaId() {
+        return mesaId;
+    }
+    public void setMesaId(int mesaId) {
+        this.mesaId = mesaId;
+    }
+    
+}
+--------------------------------------------------
+
+
+./server/src/main/java/model/CiudadanoVoto.java
+
+package model;
+
+import java.time.LocalDateTime;
+
+public class CiudadanoVoto {
+    private int id;
+    private String documento;
+    private LocalDateTime fechaVoto;
+
+    public CiudadanoVoto() {}
+
+    public CiudadanoVoto(int id, String documento, LocalDateTime fechaVoto) {
+        this.id = id;
+        this.documento = documento;
+        this.fechaVoto = fechaVoto;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public String getDocumento() {
+        return documento;
+    }
+
+    public void setDocumento(String documento) {
+        this.documento = documento;
+    }
+
+    public LocalDateTime getFechaVoto() {
+        return fechaVoto;
+    }
+
+    public void setFechaVoto(LocalDateTime fechaVoto) {
+        this.fechaVoto = fechaVoto;
+    }
+}
+--------------------------------------------------
+
+
+./server/src/main/java/model/Departamento.java
+
+package model;
+
+public class Departamento {
+    private int id;
+    private String nombre;
+
+    public Departamento(){}
+
+    public Departamento(int id, String nombre) {
+        super();
+        this.id = id;
+        this.nombre = nombre;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public String getNombre() {
+        return nombre;
+    }
+
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
+
+    
+}
+--------------------------------------------------
+
+
+./server/src/main/java/model/MesaVotacion.java
+
+package model;
+
+public class MesaVotacion {
+    private int id;
+    private int consecutive;
+    private int puestoId;
+
+    public MesaVotacion() {}
+
+    public MesaVotacion(int id, int consecutive, int puestoId) {
+        super();
+        this.id = id;
+        this.consecutive = consecutive;
+        this.puestoId = puestoId;
+    }
+
+    public int getId() {
+        return id;
+    }
+    public void setId(int id) {
+        this.id = id;
+    }
+    public int getConsecutive() {
+        return consecutive;
+    }
+    public void setConsecutive(int consecutive) {
+        this.consecutive = consecutive;
+    }
+    public int getPuestoId() {
+        return puestoId;
+    }
+    public void setPuestoId(int puestoId) {
+        this.puestoId = puestoId;
+    }
+    
+}
+--------------------------------------------------
+
+
+./server/src/main/java/model/Municipio.java
+
+package model;
+
+public class Municipio {
+    private int id;
+    private String nombre;
+    private int departamentoId;
+
+    public Municipio() {}
+    public Municipio(int id, String nombre, int departamentoId) {
+        super();
+        this.id = id;
+        this.nombre = nombre;
+        this.departamentoId = departamentoId;
+    }
+    public int getId() {
+        return id;
+    }
+    public void setId(int id) {
+        this.id = id;
+    }
+    public String getNombre() {
+        return nombre;
+    }
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
+    public int getDepartamentoId() {
+        return departamentoId;
+    }
+    public void setDepartamentoId(int departamentoId) {
+        this.departamentoId = departamentoId;
+    }
+    
+}
+--------------------------------------------------
+
+
+./server/src/main/java/model/PuestoVotacion.java
+
+package model;
+
+public class PuestoVotacion {
+    private int id;
+    private String nombre;
+    private int consecutive;
+    private String direccion;
+    private int municipioId;
+
+    public PuestoVotacion() {}
+
+    public PuestoVotacion(int id, String nombre, int consecutive, String direccion, int municipioId) {
+        super();
+        this.id = id;
+        this.nombre = nombre;
+        this.consecutive = consecutive;
+        this.direccion = direccion;
+        this.municipioId = municipioId;
+    }
+    public int getId() {
+        return id;
+    }
+    public void setId(int id) {
+        this.id = id;
+    }
+    public String getNombre() {
+        return nombre;
+    }
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
+    public int getConsecutive() {
+        return consecutive;
+    }
+    public void setConsecutive(int consecutive) {
+        this.consecutive = consecutive;
+    }
+    public String getDireccion() {
+        return direccion;
+    }
+    public void setDireccion(String direccion) {
+        this.direccion = direccion;
+    }
+    public int getMunicipioId() {
+        return municipioId;
+    }
+    public void setMunicipioId(int municipioId) {
+        this.municipioId = municipioId;
+    }
+
+}
+--------------------------------------------------
+
+
+./server/src/main/java/model/Voto.java
+
+package model;
+
+import java.time.LocalDateTime;
+
+public class Voto {
+    private int id;
+    private int candidatoId;
+    private LocalDateTime fechaEmision;
+
+    public Voto() {}
+
+    public Voto(int id, int candidatoId, LocalDateTime fechaEmision) {
+        super();
+        this.id = id;
+        this.candidatoId = candidatoId;
+        this.fechaEmision = fechaEmision;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public int getCandidatoId() {
+        return candidatoId;
+    }
+
+    public void setCandidatoId(int candidatoId) {
+        this.candidatoId = candidatoId;
+    }
+
+    public LocalDateTime getFechaEmision() {
+        return fechaEmision;
+    }
+
+    public void setFechaEmision(LocalDateTime fechaEmision) {
+        this.fechaEmision = fechaEmision;
+    }
+}
+--------------------------------------------------
+
+
+./server/src/main/java/services/QueryStationImpl.java
+
+package services;
+
+import app.QueryStation;
+import com.zeroc.Ice.Current;
+import db.ConexionBD;
+import db.ManejadorDatos;
+
+import java.sql.Connection;
+
+public class QueryStationImpl implements QueryStation {
+    @Override
+    public String query(String document, Current current) {
+        ConexionBD con = new ConexionBD(current.adapter.getCommunicator());
+        con.conectarBaseDatos();
+        Connection conn = con.getConnection();
+
+        try {
+            ManejadorDatos manejador = new ManejadorDatos(conn);
+            return manejador.obtenerLugarVotacion(document);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        } finally {
+            con.cerrarConexion();
+        }
+    }
+}
+--------------------------------------------------
+
+
+./server/src/main/java/services/VoteStationImpl.java
+
+package services;
+
+import app.Candidato;
+import app.VoteStation;
+import com.zeroc.Ice.Current;
+import db.ConexionBD;
+import db.ManejadorDatos;
+import model.Voto;
+
+import java.sql.Connection;
+import java.time.LocalDateTime;
+import java.util.List;
+
+public class VoteStationImpl implements VoteStation {
+
+    @Override
+    public int vote(String document, int candidateId, int mesaId, Current current) {
+        ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
+        connBD.conectarBaseDatos();
+        Connection conn = connBD.getConnection();
+        ManejadorDatos manejador = new ManejadorDatos(conn);
+
+        try {
+            if (!manejador.existeCiudadano(document)) {
+                return 3;
+            }
+            if (!manejador.esSuMesa(document, mesaId)) {
+                return 1;
+            }
+            if (!manejador.registrarCiudadanoSiNoExiste(document)) {
+                return 2;
+            }
+
+            Voto voto = new Voto(0, candidateId, LocalDateTime.now());
+            manejador.registrarVoto(voto);
+            return 0;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return -1;
+        } finally {
+            connBD.cerrarConexion();
+        }
+    }
+
+    @Override
+    public Candidato[] listar(Current current) {
+        ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
+        connBD.conectarBaseDatos();
+        Connection conn = connBD.getConnection();
+        ManejadorDatos manejador = new ManejadorDatos(conn);
+
+        try {
+            List<model.Candidato> lista = manejador.listarCandidatos();
+            Candidato[] resultado = new Candidato[lista.size()];
+            for (int i = 0; i < lista.size(); i++) {
+                model.Candidato c = lista.get(i);
+                resultado[i] = new Candidato(c.getId(), c.getNombre(), c.getPartidoPolitico());
+            }
+            return resultado;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new Candidato[0];
+
+        } finally {
+            connBD.cerrarConexion();
+        }
+    }
+}
+--------------------------------------------------
+
+
+./server/src/main/resources/server.config
+
+ConexionBD = jdbc:postgresql://localhost:5432/sistema_votaciones
+usuarioBD = votaciones_user
+paswordBD = votaciones123
+
+Server.Endpoints=tcp -h localhost -p 10012
+--------------------------------------------------
+
+
+📁 Carpeta procesada: ./broker/src
+Estructura completa:
+./broker/src
+└── main
+    ├── java
+    │   ├── Broker.java
+    │   └── services
+    │       └── BrokerServiceImpl.java
+    └── resources
+        └── broker.config
+
+5 directories, 3 files
+
+🧾 Archivos de código en ./broker/src (con contenido):
+
+./broker/src/main/java/Broker.java
+
+import com.zeroc.Ice.*;
+import services.BrokerServiceImpl;
+
+public class Broker {
+    public static void main(String[] args) {
+        try (Communicator communicator = Util.initialize(args, "broker.config")) {
+            ObjectAdapter adapter = communicator.createObjectAdapter("BrokerAdapter");
+            adapter.add(new BrokerServiceImpl(), Util.stringToIdentity("Broker"));
+            adapter.activate();
+            System.out.println("Broker iniciado.");
+            communicator.waitForShutdown();
+        }
+    }
+}
+
+--------------------------------------------------
+
+
+./broker/src/main/java/services/BrokerServiceImpl.java
+
+package services;
+
+import broker.BrokerService;
+import com.zeroc.Ice.Current;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class BrokerServiceImpl implements BrokerService {
+
+    private final Map<String, String> proxies = new ConcurrentHashMap<>();
+    private final List<String> proxyIds = new ArrayList<>();
+    private final AtomicInteger counter = new AtomicInteger(0);
+
+    @Override
+    public void registrarProxy(String id, String proxyString, Current current) {
+        if (!proxies.containsKey(id)) {
+            proxies.put(id, proxyString);
+            synchronized (proxyIds) {
+                proxyIds.add(id);
+            }
+            System.out.println("Registrado proxy: " + id);
+        }
+    }
+
+    @Override
+    public void registrarCliente(String idLugar, Current current) {
+        System.out.println("Registrado cliente: " + idLugar);
+    }
+
+    @Override
+    public String obtenerProxy(String idLugar, Current current) {
+        synchronized (proxyIds) {
+            if (proxyIds.isEmpty()) {
+                return null;
+            }
+            int index = counter.getAndUpdate(i -> (i + 1) % proxyIds.size());
+            String selectedId = proxyIds.get(index);
+            return proxies.get(selectedId);
+        }
+    }
+}
+
+--------------------------------------------------
+
+
+./broker/src/main/resources/broker.config
+
+BrokerAdapter.Endpoints=tcp -h localhost -p 10020
+
+--------------------------------------------------
+
+
+📁 Carpeta procesada: ./proxySinchronization/src
+Estructura completa:
+./proxySinchronization/src
+└── main
+    ├── java
+    │   ├── ProxySinchronization.java
+    │   └── services
+    │       ├── ProxySyncReceiver.java
+    │       └── ProxySyncSender.java
+    └── resources
+        └── proxy.config
+
+5 directories, 4 files
+
+🧾 Archivos de código en ./proxySinchronization/src (con contenido):
+
+./proxySinchronization/src/main/java/ProxySinchronization.java
+
+import com.zeroc.Ice.*;
+import reliableMessage.ACKServicePrx;
+import reliableMessage.RMDestinationPrx;
+import model.ReliableMessage;
+import communication.Notification;
+import services.ProxySyncReceiver;
+import services.ProxySyncSender;
+import threads.RMJob;
+import broker.BrokerServicePrx;
+import java.net.ServerSocket;
+import java.io.IOException;
+
+public class ProxySinchronization {
+    public static void main(String[] args) {
+        try (Communicator communicator = Util.initialize(args, "proxy.config")) {
+
+            // Generar ID único para este proxy
+            String instanceId = System.getProperty("instance.id", "default");
+            String proxyId = "proxySync-" + instanceId + "-" + System.currentTimeMillis();
+            
+            // Encontrar puerto disponible
+            int puerto = findAvailablePort(10030);
+            System.out.println("ProxySync '" + proxyId + "' usando puerto: " + puerto);
+
+            // Notificación entre receptor y emisor (para reenviar y confirmar mensajes)
+            Notification notification = new Notification();
+
+            // Hilo de reintentos confiables
+            RMJob job = new RMJob(notification);
+            job.start();
+
+            // Servicio receptor (ACK desde servidor)
+            ProxySyncReceiver receiver = new ProxySyncReceiver(job);
+
+            // Servicio emisor (envía mensajes al servidor)
+            ProxySyncSender sender = new ProxySyncSender(job, notification);
+
+            // Adaptador local para recibir conexiones con puerto dinámico
+            ObjectAdapter adapter = communicator.createObjectAdapterWithEndpoints(
+                "ProxySyncAdapter", "tcp -h localhost -p " + puerto);
+
+            // Registrar objetos en el adaptador
+            ObjectPrx senderPrx = adapter.add(sender, Util.stringToIdentity("Sender")); // RMSource
+            ObjectPrx ackPrx = adapter.add(receiver, Util.stringToIdentity("AckReceiver")); // ACKService
+
+            // Configurar ACK para ReliableMessaging
+            notification.setAckService(ACKServicePrx.checkedCast(ackPrx));
+
+            // Activar el adaptador
+            adapter.activate();
+
+            // -----------------------------------------------
+            // CONFIGURAR DESTINO (ServidorCentral)
+            // -----------------------------------------------
+            String serverHost = System.getProperty("server.host", "localhost");
+            String serverPort = System.getProperty("server.port", "10012");
+            
+            ObjectPrx serverBase = communicator.stringToProxy("RMDestination:tcp -h " + serverHost + " -p " + serverPort);
+            RMDestinationPrx server = RMDestinationPrx.checkedCast(serverBase);
+
+            if (server == null) {
+                System.err.println("No se pudo obtener el proxy del ServidorCentral en " + serverHost + ":" + serverPort);
+                return;
+            }
+
+            notification.setService(server);
+            System.out.println("ServidorCentral configurado como destino en ProxySynchronization.");
+
+            // -----------------------------------------------
+            // REGISTRO EN EL BROKER
+            // -----------------------------------------------
+            String brokerHost = System.getProperty("broker.host", "localhost");
+            String brokerPort = System.getProperty("broker.port", "10020");
+            
+            ObjectPrx brokerBase = communicator.stringToProxy("Broker:tcp -h " + brokerHost + " -p " + brokerPort);
+            BrokerServicePrx broker = BrokerServicePrx.checkedCast(brokerBase);
+
+            if (broker == null) {
+                System.err.println("No se pudo obtener el proxy del Broker en " + brokerHost + ":" + brokerPort);
+                return;
+            }
+
+            String proxyString = communicator.proxyToString(senderPrx);
+            broker.registrarProxy(proxyId, proxyString);
+            System.out.println("ProxySync '" + proxyId + "' registrado en el broker.");
+
+            // Esperar señal de apagado
+            System.out.println("ProxySynchronization '" + proxyId + "' activo en puerto " + puerto + " y listo.");
+            communicator.waitForShutdown();
+        }
+    }
+    
+    /**
+     * Encuentra un puerto disponible comenzando desde el puerto base
+     */
+    private static int findAvailablePort(int basePort) {
+        for (int port = basePort; port <= basePort + 1000; port++) {
+            try (ServerSocket socket = new ServerSocket(port)) {
+                return port;
+            } catch (IOException e) {
+                // Puerto ocupado, intentar el siguiente
+            }
+        }
+        throw new RuntimeException("No se pudo encontrar un puerto disponible");
+    }
+}
+--------------------------------------------------
+
+
+./proxySinchronization/src/main/java/services/ProxySyncReceiver.java
+
+package services;
+
+import com.zeroc.Ice.Current;
+import model.ReliableMessage;
+import reliableMessage.ACKService;
+import threads.RMJob;
+
+public class ProxySyncReceiver implements ACKService {
+
+    private final RMJob job;
+
+    public ProxySyncReceiver(RMJob job) {
+        this.job = job;
+    }
+
+    @Override
+    public void ack(String messageId, Current current) {
+        System.out.println("ACK recibido en ProxySync para mensaje: " + messageId);
+        job.confirmMessage(messageId);
+    }
+}
+
+--------------------------------------------------
+
+
+./proxySinchronization/src/main/java/services/ProxySyncSender.java
+
+package services;
+
+import com.zeroc.Ice.Current;
+import communication.Notification;
+import model.Message;
+import reliableMessage.RMDestinationPrx;
+import reliableMessage.RMSource;
+import threads.RMJob;
+
+public class ProxySyncSender implements RMSource {
+
+    private final RMJob job;
+    private final Notification notification;
+
+    public ProxySyncSender(RMJob job, Notification notification) {
+        this.job = job;
+        this.notification = notification;
+    }
+
+    @Override
+    public void sendMessage(Message msg, Current current) {
+        System.out.println("Mensaje recibido en ProxySync para reenviar al servidor central.");
+        job.add(msg);
+    }
+
+    @Override
+    public String consultarValidezCiudadano(String cedula, int mesaId, Current current) {
+        System.out.println("Consulta de validez de ciudadano recibida en ProxySync: " + cedula + " mesa: " + mesaId);
+        
+        try {
+            // Obtener el servicio de destino desde notification
+            RMDestinationPrx destination = notification.getService();
+            if (destination != null) {
+                // Reenviar la consulta directamente al servidor
+                String resultado = destination.consultarValidezCiudadano(cedula, mesaId);
+                System.out.println("Respuesta del servidor: " + resultado);
+                return resultado;
+            } else {
+                System.err.println("No hay servicio de destino configurado");
+                return "ERROR:No hay conexión con el servidor central";
+            }
+        } catch (Exception e) {
+            System.err.println("Error consultando validez de ciudadano: " + e.getMessage());
+            return "ERROR:Error de comunicación con el servidor - " + e.getMessage();
+        }
+    }
+
+    @Override
+    public void setServerProxy(RMDestinationPrx destination, Current current) {
+        // Este método ya no se usa porque el destino se configura directamente en ProxySynchronization
+        System.out.println("setServerProxy llamado, pero el destino ya está configurado.");
+    }
+
+
+    // Asegurarse que el método listarCandidatos está implementado
+    @Override
+    public String listarCandidatos(Current current) {
+        System.out.println("Solicitud de lista de candidatos recibida en ProxySync.");
+        try {
+            RMDestinationPrx destination = notification.getService();
+            if (destination != null) {
+                return destination.listarCandidatos();
+            } else {
+                return "ERROR:Sin conexión al servidor.";
+            }
+        } catch (Exception e) {
+            return "ERROR:" + e.getMessage();
+        }
+    }
+
+}
+--------------------------------------------------
+
+
+./proxySinchronization/src/main/resources/proxy.config
+
+ProxySyncAdapter.Endpoints=tcp -h localhost -p 10030
+
+--------------------------------------------------
+
+
+📁 Carpeta procesada: ./lugarVotacion/src
+Estructura completa:
+./lugarVotacion/src
+└── main
+    ├── java
+    │   ├── LugarVotacion.java
+    │   └── services
+    │       └── LugarVotacionReceiver.java
+    └── resources
+        └── lugarVotacion.config
+
+5 directories, 3 files
+
+🧾 Archivos de código en ./lugarVotacion/src (con contenido):
+
+./lugarVotacion/src/main/java/services/LugarVotacionReceiver.java
+
+package services;
+
+import lugarVotacion.Mesa;
+import lugarVotacion.Voto;
+import lugarVotacion.ValidacionCedula;
+import lugarVotacion.Candidato;
+import com.zeroc.Ice.Current;
+
+import java.util.Arrays;
+
+import com.zeroc.Ice.Communicator;
+import model.Message;
+import reliableMessage.RMSourcePrx;
+import broker.BrokerServicePrx;
+
+public class LugarVotacionReceiver implements Mesa {
+
+    private RMSourcePrx rm;
+    private final BrokerServicePrx broker;
+    private final String idLugar;
+    private final Communicator communicator;
+    private int contadorVotos = 0;
+    private static final int REBALANCE_INTERVAL = 20;
+
+    public LugarVotacionReceiver(BrokerServicePrx broker, String idLugar, Communicator communicator) {
+        this.broker = broker;
+        this.idLugar = idLugar;
+        this.communicator = communicator;
+        
+        // Obtener proxy inicial
+        this.rm = obtenerNuevoProxy();
+    }
+
+    @Override
+    public ValidacionCedula consultarCedula(String cedula, int mesaId, Current current) {
+        System.out.println("Consulta de cédula recibida: " + cedula + " para mesa: " + mesaId);
+        
+        ValidacionCedula resultado = new ValidacionCedula();
+        
+        try {
+            if (rm != null) {
+                // Llamar al proxy para validar la cédula
+                String respuesta = rm.consultarValidezCiudadano(cedula, mesaId);
+                
+                // Procesar la respuesta del servidor
+                procesarRespuestaValidacion(respuesta, resultado);
+                
+                System.out.println("Respuesta de validación: " + resultado.mensaje);
+            } else {
+                resultado.esValida = false;
+                resultado.mensaje = "Error: No hay conexión con el servidor";
+                System.err.println("No hay proxy disponible para consultar cédula");
+            }
+        } catch (Exception e) {
+            System.err.println("Error consultando cédula: " + e.getMessage());
+            resultado.esValida = false;
+            resultado.mensaje = "Error de conexión: " + e.getMessage();
+            
+            // Intentar obtener un nuevo proxy en caso de error
+            System.out.println("Intentando obtener nuevo proxy debido a error...");
+            RMSourcePrx nuevoProxy = obtenerNuevoProxy();
+            if (nuevoProxy != null) {
+                this.rm = nuevoProxy;
+                try {
+                    String respuesta = rm.consultarValidezCiudadano(cedula, mesaId);
+                    procesarRespuestaValidacion(respuesta, resultado);
+                } catch (Exception e2) {
+                    System.err.println("Error crítico consultando cédula: " + e2.getMessage());
+                    resultado.esValida = false;
+                    resultado.mensaje = "Error crítico de conexión";
+                }
+            }
+        }
+        
+        return resultado;
+    }
+
+    private void procesarRespuestaValidacion(String respuesta, ValidacionCedula resultado) {
+        // Formato esperado: "VALIDA:mensaje" o "INVALIDA:mensaje" o "ERROR:mensaje"
+        String[] partes = respuesta.split(":", 2);
+        if (partes.length == 2) {
+            String estado = partes[0];
+            String mensaje = partes[1];
+            
+            switch (estado) {
+                case "VALIDA":
+                    resultado.esValida = true;
+                    resultado.mensaje = mensaje;
+                    break;
+                case "INVALIDA":
+                    resultado.esValida = false;
+                    resultado.mensaje = mensaje;
+                    break;
+                case "ERROR":
+                default:
+                    resultado.esValida = false;
+                    resultado.mensaje = mensaje;
+                    break;
+            }
+        } else {
+            resultado.esValida = false;
+            resultado.mensaje = "Error procesando respuesta del servidor";
+        }
+    }
+
+    @Override
+    public void enviarVoto(Voto voto, Current current) {
+        System.out.println("Voto recibido: id " + voto.idVoto);
+        
+        // Incrementar contador y verificar si necesita rebalanceo
+        contadorVotos++;
+        if (contadorVotos % REBALANCE_INTERVAL == 0) {
+            System.out.println("Realizando rebalanceo de proxy (voto #" + contadorVotos + ")");
+            RMSourcePrx nuevoProxy = obtenerNuevoProxy();
+            if (nuevoProxy != null) {
+                this.rm = nuevoProxy;
+                System.out.println("Proxy actualizado exitosamente");
+            } else {
+                System.err.println("No se pudo obtener nuevo proxy, manteniendo el actual");
+            }
+        }
+
+        // Convertir Voto a Message incluyendo el idVoto explícitamente
+        Message msg = new Message();
+        msg.idVoto = voto.idVoto;
+        msg.message = voto.idCandidato + "|" + voto.fecha;
+
+
+        try {
+            if (rm != null) {
+                rm.sendMessage(msg);
+                System.out.println("Voto #" + contadorVotos + " reenviado a reliable message.");
+            } else {
+                System.err.println("No hay proxy disponible para enviar el voto");
+            }
+        } catch (Exception e) {
+            System.err.println("Error reenviando voto: " + e.getMessage());
+            
+            // En caso de error, intentar obtener un nuevo proxy
+            System.out.println("Intentando obtener nuevo proxy debido a error...");
+            RMSourcePrx nuevoProxy = obtenerNuevoProxy();
+            if (nuevoProxy != null) {
+                this.rm = nuevoProxy;
+                try {
+                    rm.sendMessage(msg);
+                    System.out.println("Voto reenviado exitosamente con nuevo proxy.");
+                } catch (Exception e2) {
+                    System.err.println("Error crítico: No se pudo reenviar el voto incluso con nuevo proxy: " + e2.getMessage());
+                }
+            }
+        }
+    }
+    
+    /**
+     * Obtiene un nuevo proxy del broker
+     */
+    private RMSourcePrx obtenerNuevoProxy() {
+        try {
+            String proxyString = broker.obtenerProxy(idLugar);
+            if (proxyString == null) {
+                System.err.println("No hay proxies disponibles en el Broker.");
+                return null;
+            }
+
+            System.out.println("Nuevo proxy obtenido del broker: " + proxyString);
+            RMSourcePrx nuevoRm = RMSourcePrx.checkedCast(communicator.stringToProxy(proxyString));
+            
+            if (nuevoRm == null) {
+                System.err.println("No se pudo obtener el proxy RMSource del ProxySync.");
+                return null;
+            }
+            
+            return nuevoRm;
+        } catch (Exception e) {
+            System.err.println("Error obteniendo nuevo proxy: " + e.getMessage());
+            return null;
+        }
+    }
+
+
+    @Override
+    public Candidato[] obtenerCandidatos(Current current) {
+        System.out.println("Solicitud de lista de candidatos recibida");
+        
+        try {
+            if (rm == null) {
+                throw new RuntimeException("No hay conexión con el servidor");
+            }
+            
+            // Obtener la lista de candidatos como string formateado
+            String candidatosStr = rm.listarCandidatos();
+            
+            if (candidatosStr == null || candidatosStr.startsWith("ERROR:")) {
+                throw new RuntimeException(candidatosStr != null ? candidatosStr : "Respuesta vacía del servidor");
+            }
+            
+            // Parsear el string en formato "id|nombre|partido;id|nombre|partido;..."
+            return Arrays.stream(candidatosStr.split(";"))
+                    .filter(s -> !s.isEmpty())
+                    .map(s -> {
+                        String[] partes = s.split("\\|");
+                        if (partes.length != 3) {
+                            throw new RuntimeException("Formato de candidato inválido: " + s);
+                        }
+                        Candidato c = new Candidato();
+                        c.id = Integer.parseInt(partes[0]);
+                        c.nombre = partes[1];
+                        c.partido = partes[2];
+                        return c;
+                    })
+                    .toArray(Candidato[]::new);
+                    
+        } catch (Exception e) {
+            System.err.println("Error obteniendo candidatos: " + e.getMessage());
+            
+            // Intentar obtener un nuevo proxy en caso de error
+            System.out.println("Intentando obtener nuevo proxy debido a error...");
+            RMSourcePrx nuevoProxy = obtenerNuevoProxy();
+            if (nuevoProxy != null) {
+                this.rm = nuevoProxy;
+                try {
+                    // Reintentar con el nuevo proxy
+                    return obtenerCandidatos(current);
+                } catch (Exception e2) {
+                    throw new RuntimeException("Error crítico obteniendo candidatos: " + e2.getMessage());
+                }
+            }
+            
+            throw new RuntimeException("Error obteniendo lista de candidatos: " + e.getMessage());
+        }
+    }
+}
+--------------------------------------------------
+
+
+./lugarVotacion/src/main/java/LugarVotacion.java
+
+import lugarVotacion.Mesa;
+import com.zeroc.Ice.*;
+import model.Message;
+import reliableMessage.RMDestinationPrx;
+import reliableMessage.RMSourcePrx;
+import services.LugarVotacionReceiver;
+import broker.BrokerServicePrx;
+import java.net.ServerSocket;
+import java.io.IOException;
+
+public class LugarVotacion {
+    public static void main(String[] args) {
+        try (Communicator communicator = Util.initialize(args)) {
+            // Obtener proxy del Broker
+            ObjectPrx brokerBase = communicator.stringToProxy("Broker:tcp -h localhost -p 10020");
+            BrokerServicePrx broker = BrokerServicePrx.checkedCast(brokerBase);
+
+            if (broker == null) {
+                System.err.println("No se pudo obtener el proxy del Broker.");
+                return;
+            }
+
+            // Generar ID único para este lugar de votación
+            String instanceId = System.getProperty("instance.id", "default");
+            String idLugar = "lugarVotacion-" + instanceId + "-" + System.currentTimeMillis();
+            
+            // Encontrar puerto disponible
+            int puerto = findAvailablePort(10000);
+            System.out.println("Usando puerto: " + puerto + " para instancia: " + idLugar);
+
+            // Registrar este lugar de votación
+            broker.registrarCliente(idLugar);
+
+            // Crear adaptador local con puerto encontrado
+            ObjectAdapter adapter = communicator.createObjectAdapterWithEndpoints(
+                "LugarVotacion", "tcp -h localhost -p " + puerto);
+
+            // Crear servicio receptor pasando el broker para rebalanceo
+            Mesa servant = new LugarVotacionReceiver(broker, idLugar, communicator);
+            adapter.add(servant, Util.stringToIdentity("LugarVotacion"));
+
+            adapter.activate();
+
+            System.out.println("Lugar de votación '" + idLugar + "' activo en puerto " + puerto);
+            communicator.waitForShutdown();
+        }
+    }
+    
+    /**
+     * Encuentra un puerto disponible comenzando desde el puerto base
+     */
+    private static int findAvailablePort(int basePort) {
+        for (int port = basePort; port <= basePort + 1000; port++) {
+            try (ServerSocket socket = new ServerSocket(port)) {
+                return port;
+            } catch (IOException e) {
+                // Puerto ocupado, intentar el siguiente
+            }
+        }
+        throw new RuntimeException("No se pudo encontrar un puerto disponible");
+    }
+}
+--------------------------------------------------
+
+
+./lugarVotacion/src/main/resources/lugarVotacion.config
+
+MesaService.Endpoints=tcp -h localhost -p 10000
+--------------------------------------------------
+
+
+📦 Archivos especiales encontrados fuera de las carpetas 'src' o incluidas:
+
+
+./build.gradle
+
+/*
+ * This file was generated by the Gradle 'init' task.
+ *
+ * This is a general purpose Gradle build.
+ * Learn more about Gradle by exploring our Samples at https://docs.gradle.org/8.12/samples
+ */
+
+plugins {
+  id("com.zeroc.gradle.ice-builder.slice") version "1.5.0" apply false
+}
+
+subprojects{
+
+    apply plugin: 'java'
+    apply plugin: 'application'
+    apply plugin: 'com.zeroc.gradle.ice-builder.slice'
+
+    
+}
+
+--------------------------------------------------
+
+
+./mesaVotacion/build.gradle
+
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.zeroc:ice:3.7.2'
+    implementation project(':lugarVotacion')
+}
+
+jar {
+    manifest {
+        attributes(
+            "Main-Class": project.name.capitalize(),
+            "Class-Path": configurations.runtimeClasspath.resolve().collect { it.toURI() }.join(' ')
+        )
+    }
+}
+--------------------------------------------------
+
+
+./reliableServer/build.gradle
+
+slice {
+    java {
+        files = [file("ReliableMessage.ice")]
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies{
+    implementation 'com.zeroc:ice:3.7.2'
+
+}
+
+
+jar {
+        manifest {
+            attributes(
+                "Main-Class": project.name.capitalize(),
+                "Class-Path": configurations.runtimeClasspath.resolve().collect { it.toURI() }.join(' ')
+            )
+        }
+    }
+--------------------------------------------------
+
+
+./reliableServer/ReliableMessage.ice
+
+module reliableMessage {
+    ["java:serializable:model.ReliableMessage"]
+    sequence<byte> RMessage;
+    ["java:serializable:model.Message"]
+    sequence<byte> Message;
+    ["java:serializable:model.ConsultaCedula"]
+    sequence<byte> ConsultaCedula;
+
+    interface ACKService{
+        void ack(string messageId);
+    }
+    interface RMDestination{
+        void reciveMessage(RMessage rmessage, ACKService* prx);
+        string consultarValidezCiudadano(string cedula, int mesaId);
+        string listarCandidatos();  // Cambiado de ListaCandidatos a string
+    }
+    interface RMSource{
+        void setServerProxy(RMDestination* destination);
+        void sendMessage(Message msg);
+        string consultarValidezCiudadano(string cedula, int mesaId);
+        string listarCandidatos();  // Cambiado de ListaCandidatos a string
+    }
+}
+--------------------------------------------------
+
+
+./server/Service.ice
+
+module app {
+
+    struct Candidato {
+        int id;
+        string nombre;
+        string partidoPolitico;
+    };
+
+    sequence<Candidato> ListaCandidatos; // 👈 definición de secuencia
+
+    interface VoteStation {
+        int vote(string document, int candidateId, int mesaId);
+        ListaCandidatos listar(); // 👈 usar la secuencia en el retorno
+    }
+
+    interface QueryStation {
+        string query(string document);
+    }
+}
+
+--------------------------------------------------
+
+
+./server/build.gradle
+
+repositories {
+    mavenCentral()
+}
+
+slice {
+    java {
+        files = [
+            file("../reliableServer/ReliableMessage.ice"),
+            file("Service.ice") // <- Agregamos el nuevo .ice local
+        ]
+    }
+}
+
+dependencies {
+    implementation 'com.zeroc:ice:3.7.2'
+    implementation project(':reliableServer')
+    implementation 'org.postgresql:postgresql:42.7.1'
+}
+
+jar {
+    manifest {
+        attributes(
+            "Main-Class": project.name.capitalize(),
+            "Class-Path": configurations.runtimeClasspath.resolve().collect { it.toURI() }.join(' ')
+        )
+    }
+}
+
+--------------------------------------------------
+
+
+./broker/broker.ice
+
+module broker {
+
+    interface BrokerService {
+        void registrarProxy(string id, string proxyString);
+        void registrarCliente(string idLugar);
+        string obtenerProxy(string idLugar);
+    }
+
+}
+
+--------------------------------------------------
+
+
+./broker/build.gradle
+
+slice {
+    java {
+        files = [file("broker.ice")]
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+
+dependencies {
+    implementation 'com.zeroc:ice:3.7.2'
+}
+
+jar {
+    manifest {
+        attributes(
+            "Main-Class": project.name.capitalize(),
+            "Class-Path": configurations.runtimeClasspath.resolve().collect { it.toURI() }.join(' ')
+        )
+    }
+}
+
+--------------------------------------------------
+
+
+./proxySinchronization/build.gradle
+
+repositories {
+    mavenCentral()
+}
+
+
+dependencies {
+    implementation 'com.zeroc:ice:3.7.2'
+    implementation project(':reliableServer')  // contiene reliableMessage, model, communication, threads
+    implementation project(':broker')          // contiene broker.BrokerServicePrx
+}
+
+jar {
+    manifest {
+        attributes(
+            "Main-Class": project.name.capitalize(),
+            "Class-Path": configurations.runtimeClasspath.resolve().collect { it.toURI() }.join(' ')
+        )
+    }
+}
+
+--------------------------------------------------
+
+
+./proxySinchronization/proxy.ice
+
+
+--------------------------------------------------
+
+
+./settings.gradle
+
+/*
+ * This file was generated by the Gradle 'init' task.
+ *
+ * The settings file is used to specify which projects to include in your build.
+ * For more detailed information on multi-project builds, please refer to https://docs.gradle.org/8.12/userguide/multi_project_builds.html in the Gradle documentation.
+ */
+
+rootProject.name = 'reliable-message-example'
+
+
+include('reliableServer')
+include('server')
+include('lugarVotacion')
+include ('mesaVotacion')
+include ('broker')
+include ('proxySinchronization')
+
+--------------------------------------------------
+
+
+./lugarVotacion/build.gradle
+
+slice {
+    java {
+        files = [file("lugarVotacion.ice")]
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies{
+    implementation 'com.zeroc:ice:3.7.2'
+    implementation project(':reliableServer')
+    implementation project(':broker')
+}
+
+jar {
+        manifest {
+            attributes(
+                "Main-Class": project.name.capitalize(),
+                "Class-Path": configurations.runtimeClasspath.resolve().collect { it.toURI() }.join(' ')
+            )
+        }
+    }
+--------------------------------------------------
+
+
+./lugarVotacion/lugarVotacion.ice
+
+module lugarVotacion {
+
+    struct Voto {
+        int idVoto;
+        int idCandidato;
+        string fecha;
+    };
+
+    struct ValidacionCedula {
+        bool esValida;
+        string mensaje;
+        int mesaId;
+    };
+
+    // Nueva estructura local para candidatos
+    struct Candidato {
+        int id;
+        string nombre;
+        string partido;
+    };
+
+    sequence<Candidato> ListaCandidatos;
+
+    interface Mesa {
+        void enviarVoto(Voto voto);
+        ValidacionCedula consultarCedula(string cedula, int mesaId);
+        ListaCandidatos obtenerCandidatos();  // Usa la definición local
+    }
+}
+--------------------------------------------------
+

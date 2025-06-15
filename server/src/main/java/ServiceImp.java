@@ -35,7 +35,6 @@ public class ServiceImp implements RMDestination {
         System.out.println("Cantidad de votos recibidos: " + contadorExito);
 
         try {
-            // Parsear el contenido: idCandidato|fechaISO8601
             String[] partes = msg.message.split("\\|");
             if (partes.length != 2) {
                 System.err.println("Formato inválido de mensaje: " + msg.message);
@@ -44,11 +43,10 @@ public class ServiceImp implements RMDestination {
             }
 
             int idCandidato = Integer.parseInt(partes[0]);
-            LocalDateTime fecha = LocalDateTime.parse(partes[1]);  // ✅ esta es la corrección clave
+            LocalDateTime fecha = LocalDateTime.parse(partes[1]);
 
             Voto voto = new Voto(0, idCandidato, fecha);
 
-            // Guardar en BD
             ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
             String conexionError = connBD.conectarBaseDatos();
             if (conexionError != null) {
@@ -59,7 +57,6 @@ public class ServiceImp implements RMDestination {
 
             ManejadorDatos manejador = new ManejadorDatos(connBD.getConnection());
             manejador.registrarVoto(voto);
-
             System.out.println("Voto registrado en la base de datos: Candidato " + idCandidato + ", Fecha " + fecha);
             connBD.cerrarConexion();
 
@@ -71,44 +68,44 @@ public class ServiceImp implements RMDestination {
         prx.ack(rmessage.getUuid());
     }
 
-
     @Override
     public String consultarValidezCiudadano(String cedula, int mesaId, Current current) {
         System.out.println("Consultando validez de ciudadano: " + cedula + " para mesa: " + mesaId);
-        
+
         ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
         String resultado = connBD.conectarBaseDatos();
-        
+
         if (resultado != null) {
             System.err.println("Error conectando a base de datos: " + resultado);
             return "ERROR:Error de conexión a base de datos";
         }
-        
+
         ManejadorDatos manejador = new ManejadorDatos(connBD.getConnection());
-        
+
         try {
-            // Validación 1: ¿Existe el ciudadano?
-            if (!manejador.existeCiudadano(cedula)) {
-                System.out.println("Ciudadano no encontrado: " + cedula);
-                return "INVALIDA:Ciudadano no registrado en el sistema";
+            int estado = manejador.validarCiudadano(cedula, mesaId);
+            switch (estado) {
+                case 3:
+                    System.out.println("Ciudadano no encontrado: " + cedula);
+                    return "INVALIDA:Ciudadano no registrado en el sistema";
+
+                case 1:
+                    System.out.println("Mesa incorrecta para ciudadano: " + cedula);
+                    String lugarCorrecto = manejador.obtenerLugarVotacion(cedula);
+                    return "INVALIDA:No es su mesa asignada. " + lugarCorrecto;
+
+                case 0:
+                    if (!manejador.registrarCiudadanoSiNoExiste(cedula)) {
+                        System.out.println("Ciudadano ya votó: " + cedula);
+                        return "INVALIDA:Ya has ejercido tu derecho al voto";
+                    }
+                    System.out.println("Ciudadano válido para votar: " + cedula);
+                    return "VALIDA:Ciudadano habilitado para votar";
+
+                default:
+                    return "ERROR:Estado de validación desconocido";
             }
-            
-            //Validación 2: ¿Es su mesa asignada?
-            if (!manejador.esSuMesa(cedula, mesaId)) {
-                System.out.println("Mesa incorrecta para ciudadano: " + cedula);
-                String lugarCorrect = manejador.obtenerLugarVotacion(cedula);
-                return "INVALIDA:No es su mesa asignada. " + lugarCorrect;
-            }
-            
-            // Validación 3: ¿Ya ha votado?
-            if (!manejador.registrarCiudadanoSiNoExiste(cedula)) {
-                System.out.println("Ciudadano ya votó: " + cedula);
-                return "INVALIDA:Ya has ejercido tu derecho al voto";
-            }
-            
-            System.out.println("Ciudadano válido para votar: " + cedula);
-            return "VALIDA:Ciudadano habilitado para votar";
-            
+
         } catch (Exception e) {
             System.err.println("Error procesando validación de ciudadano: " + e.getMessage());
             e.printStackTrace();
@@ -118,7 +115,6 @@ public class ServiceImp implements RMDestination {
         }
     }
 
-   // Modificar el método listarCandidatos existente
     @Override
     public String listarCandidatos(Current current) {
         ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
@@ -136,5 +132,4 @@ public class ServiceImp implements RMDestination {
             connBD.cerrarConexion();
         }
     }
-
 }

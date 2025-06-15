@@ -116,6 +116,23 @@ public class ManejadorDatos {
         }
     }
 
+    public int validarCiudadano(String documento, int mesaId) throws SQLException {
+    String sql = "SELECT mesa_id FROM ciudadano WHERE documento = ?";
+    try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
+        stmt.setString(1, documento);
+        ResultSet rs = stmt.executeQuery();
+        if (!rs.next()) {
+            return 3; // No existe
+        }
+        int mesaAsignada = rs.getInt("mesa_id");
+        if (mesaAsignada != mesaId) {
+            return 1; // No es su mesa
+        }
+        return 0; // Es su mesa
+    }
+}
+
+
 
 
 }
