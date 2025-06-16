@@ -88,7 +88,7 @@ public class MesaVotacion {
             if (cedula.equalsIgnoreCase("salir")) break;
 
             if (cedula.isEmpty()) {
-                System.out.println("⚠️ Cédula no puede estar vacía");
+                System.out.println("Cédula no puede estar vacía");
                 continue;
             }
 

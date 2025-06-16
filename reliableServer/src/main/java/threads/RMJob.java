@@ -44,7 +44,6 @@ public class RMJob extends Thread{
     @Override
     public void run(){
         while (enable) { 
-            System.out.println("cicle");
             for(Map.Entry<String,ReliableMessage> rm: messagesPendig.entrySet()){
                 try {
                     System.out.println("Sendig messge");

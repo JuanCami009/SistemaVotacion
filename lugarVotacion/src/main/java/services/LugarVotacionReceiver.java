@@ -115,7 +115,6 @@ public class LugarVotacionReceiver implements Mesa {
             if (nuevoProxy != null) {
                 this.rm = nuevoProxy;
                 this.retryJob.actualizarProxy(nuevoProxy);
-                System.out.println("Proxy actualizado exitosamente");
             } else {
                 System.err.println("No se pudo obtener nuevo proxy, manteniendo el actual");
             }
