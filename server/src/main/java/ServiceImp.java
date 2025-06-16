@@ -22,19 +22,30 @@ public class ServiceImp implements RMDestination {
     @Override
     public void reciveMessage(ReliableMessage rmessage, ACKServicePrx prx, Current current) {
         Message msg = rmessage.getMessage();
+        ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
+        String conexionError = connBD.conectarBaseDatos();
 
-        if (!votosProcesados.add(msg.idVoto)) {
-            System.out.println("Duplicado detectado para voto id: " + msg.idVoto);
-            System.out.println("Contador Duplicados: " + contadorDuplicado++);
+        if (conexionError != null) {
+            System.err.println("Error de conexión BD: " + conexionError);
             prx.ack(rmessage.getUuid());
             return;
         }
 
-        System.out.println("Procesando voto id: " + msg.idVoto);
-        contadorExito++;
-        System.out.println("Cantidad de votos recibidos: " + contadorExito);
-
         try {
+            ManejadorDatos manejador = new ManejadorDatos(connBD.getConnection());
+
+            // Verificar si el voto ya existe en la BD
+            if (manejador.existeVoto(msg.idVoto)) {
+                System.out.println("Voto duplicado detectado con ID: " + msg.idVoto);
+                contadorDuplicado++;
+                prx.ack(rmessage.getUuid());
+                return;
+            }
+
+            System.out.println("Procesando voto id: " + msg.idVoto);
+            contadorExito++;
+            System.out.println("Cantidad de votos recibidos: " + contadorExito);
+
             String[] partes = msg.message.split("\\|");
             if (partes.length != 2) {
                 System.err.println("Formato inválido de mensaje: " + msg.message);
@@ -45,28 +56,20 @@ public class ServiceImp implements RMDestination {
             int idCandidato = Integer.parseInt(partes[0]);
             LocalDateTime fecha = LocalDateTime.parse(partes[1]);
 
-            Voto voto = new Voto(0, idCandidato, fecha);
-
-            ConexionBD connBD = new ConexionBD(current.adapter.getCommunicator());
-            String conexionError = connBD.conectarBaseDatos();
-            if (conexionError != null) {
-                System.err.println("Error de conexión BD: " + conexionError);
-                prx.ack(rmessage.getUuid());
-                return;
-            }
-
-            ManejadorDatos manejador = new ManejadorDatos(connBD.getConnection());
+            Voto voto = new Voto(msg.idVoto, idCandidato, fecha);
             manejador.registrarVoto(voto);
+
             System.out.println("Voto registrado en la base de datos: Candidato " + idCandidato + ", Fecha " + fecha);
-            connBD.cerrarConexion();
 
         } catch (Exception e) {
             System.err.println("Error al procesar y registrar voto: " + e.getMessage());
             e.printStackTrace();
+        } finally {
+            connBD.cerrarConexion();
+            prx.ack(rmessage.getUuid());
         }
-
-        prx.ack(rmessage.getUuid());
     }
+
 
     @Override
     public String consultarValidezCiudadano(String cedula, int mesaId, Current current) {

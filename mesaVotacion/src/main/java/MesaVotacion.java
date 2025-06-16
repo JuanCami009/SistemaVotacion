@@ -3,6 +3,8 @@ import lugarVotacion.Voto;
 import lugarVotacion.ValidacionCedula;
 import lugarVotacion.Candidato; // Nueva importación
 import com.zeroc.Ice.*;
+
+import java.util.Random;
 import java.util.Scanner;
 
 public class MesaVotacion {
@@ -54,7 +56,8 @@ public class MesaVotacion {
             Voto voto = new Voto();
             int baseId = 1000 * Integer.parseInt(instanceId.replaceAll("\\D+", ""));
             voto.idVoto = baseId + i;  // Ejemplo: mesa1 → 1001, 1002... | mesa2 → 2001, 2002...
-            
+            voto.idCandidato = (int) (Math.random() * 10) + 1;
+            voto.fecha = java.time.LocalDateTime.now().toString();
             try {
                 cliente.enviarVoto(voto);
                 System.out.println("Voto " + i + "/" + cantidadVotos + " enviado (ID: " + voto.idVoto + ")");
@@ -78,7 +81,7 @@ public class MesaVotacion {
         int contadorVotos = 1;
 
         System.out.println("=== MODO INTERACTIVO UNIFICADO ===");
-
+        
         while (true) {
             System.out.print("\nIngrese su número de cédula (o escriba 'salir' para terminar): ");
             String cedula = scanner.nextLine().trim();

@@ -18,23 +18,16 @@ public class ConexionBD {
 	public String conectarBaseDatos() {
     try {
         Properties prop = com.getProperties();
-        System.out.println("Intentando conectar con: " + prop.getProperty("ConexionBD"));
-        
         Class.forName("org.postgresql.Driver");
-        System.out.println("Driver PostgreSQL cargado correctamente");
-        
         String cadenaconexionRemota = prop.getProperty("ConexionBD");
         String usuario = prop.getProperty("usuarioBD");
         String password = prop.getProperty("paswordBD");
-        
-        System.out.println("Conectando a: " + cadenaconexionRemota + " con usuario: " + usuario);
-        
+    
         conexion = DriverManager.getConnection(cadenaconexionRemota, usuario, password);
         
         if (conexion == null) {
             return "No se pudo establecer la conexión";
         }
-        System.out.println("Conexión establecida correctamente");
         return null;
     } catch (ClassNotFoundException e) {
         return "Error: Driver PostgreSQL no encontrado: " + e.getMessage();

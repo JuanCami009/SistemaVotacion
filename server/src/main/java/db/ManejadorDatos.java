@@ -18,13 +18,25 @@ public class ManejadorDatos {
 
 
     public void registrarVoto(Voto voto) throws SQLException {
-        String sql = "INSERT INTO voto (candidato, fecha_emision) VALUES (?, ?)";
+        String sql = "INSERT INTO voto (id, candidato, fecha_emision) VALUES (?, ?, ?)";
         try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
-            stmt.setInt(1, voto.getCandidatoId());
-            stmt.setTimestamp(2, Timestamp.valueOf(voto.getFechaEmision()));
-            stmt.executeUpdate();
+        stmt.setInt(1, voto.getId());  // ahora pasas el ID
+        stmt.setInt(2, voto.getCandidatoId());
+        stmt.setTimestamp(3, Timestamp.valueOf(voto.getFechaEmision()));
+        stmt.executeUpdate();
+    }
+
+    }
+
+    public boolean existeVoto(int idVoto) throws SQLException {
+        String sql = "SELECT 1 FROM voto WHERE id = ?";
+        try (PreparedStatement stmt = conexion.prepareStatement(sql)) {
+            stmt.setInt(1, idVoto);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();  // true si ya existe
         }
     }
+
 
     public List<Candidato> listarCandidatos() throws SQLException {
         List<Candidato> candidatos = new ArrayList<>();
