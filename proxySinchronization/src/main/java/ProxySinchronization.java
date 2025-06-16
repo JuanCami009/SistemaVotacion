@@ -26,7 +26,13 @@ public class ProxySinchronization {
             Notification notification = new Notification();
 
             // Hilo de reintentos confiables
+            
             RMJob job = new RMJob(notification);
+
+            // Leer número de votos esperados desde propiedad del sistema
+            int votosEsperados = Integer.parseInt(System.getProperty("votos.esperados", "0"));
+            job.setVotosEsperados(votosEsperados);
+
             job.start();
 
             // Servicio receptor (ACK desde servidor)
